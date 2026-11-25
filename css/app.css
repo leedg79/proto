@@ -425,3 +425,31 @@ h1, h2, h3 { margin: 0; line-height: 1.25; }
 .bf-controls { margin-top: 12px; padding-top: 8px; border-top: 1px solid #ffffff0d; }
 .bf-controls .bpm-row { margin: 8px 0 4px; }
 .bf-controls .bpm-row button { width: 46px; height: 44px; border-radius: 12px; border: 1px solid var(--line); background: var(--panel2); font-family: var(--mono); font-size: 14px; }
+.topic.pending span { opacity: .45; cursor: not-allowed; }
+.topic.pending small { font-size: 11px; margin-left: 4px; }
+
+/* ── Play Session ── */
+.wide-seg { display: flex; flex-wrap: wrap; width: 100%; }
+.wide-seg button { flex: 1 1 45%; }
+.pl-info { text-align: center; margin: -2px 0 8px; }
+.pl-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 12px 0; }
+.pl-pair .chord-cell svg { max-width: 150px; }
+.pl-pair .next { opacity: .7; }
+.pl-cap { font-size: 12.5px !important; color: var(--muted); }
+.pl-cap b { color: var(--text); font-size: 15px; margin-left: 4px; }
+.pl-done { margin-top: 12px; padding: 12px; border-radius: 14px; background: #a6f36b14; border: 1px solid #a6f36b55; font-size: 14px; }
+.pl-done p { margin: 0 0 10px; }
+.sheet { display: grid; gap: 4px; }
+.sheet-row { display: grid; grid-template-columns: 46px repeat(4, minmax(0, 1fr)); gap: 4px; align-items: stretch; }
+.sheet-label { display: flex; flex-direction: column; justify-content: center; }
+.sheet-label .sec { font-weight: 800; color: var(--accent); font-size: 17px; line-height: 1.1; }
+.sheet-label small { font-size: 9.5px; color: var(--faint); line-height: 1.2; }
+.sheet-bar { display: flex; gap: 4px; padding: 6px 5px; border-radius: 8px; background: var(--panel2); border-left: 2px solid var(--line); cursor: pointer; min-height: 44px; }
+.sheet-bar.past { opacity: .55; }
+.sheet-bar.now { outline: 2px solid var(--accent); background: #a6f36b1f; }
+.sheet-chord { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.sheet-chord b { font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sheet-chord small { font-size: 9.5px; color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sheet-bar.two { flex-direction: column; gap: 2px; }
+.sheet-bar.two .sheet-chord { flex-direction: row; align-items: baseline; gap: 4px; }
+.sheet-bar.two .sheet-chord b { font-size: 11.5px; }

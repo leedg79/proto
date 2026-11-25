@@ -9,16 +9,19 @@ import * as Metro from "./audio/metronome.js";
 import * as NoteFinder from "./modules/notes/finder-view.js";
 import * as RandomChord from "./modules/chords/random-view.js";
 import * as BpmChord from "./modules/chords/bpm-view.js";
+import * as PlaySession from "./modules/chords/play-view.js";
+import { KEYS as PLAY_KEYS, STYLES as PLAY_STYLES } from "./modules/chords/play-core.js";
 import { renderDictionary } from "./modules/chords/dictionary-view.js";
 
-const APP_VERSION = "1.4.0";
+const APP_VERSION = "1.5.0";
 
 // 구현된 과제의 연습 화면 (모듈/과제 → 화면 모듈)
 // 화면 모듈: settingsHtml, bindSettings, readSettings, mount, clearFinder
 const CONTENT = {
   "notes/note-finder": NoteFinder,
   "chords/random-chord": RandomChord,
-  "chords/bpm-chord": BpmChord
+  "chords/bpm-chord": BpmChord,
+  "chords/play-session": PlaySession
 };
 const contentFor = (mod, task) => CONTENT[`${mod}/${task}`] || null;
 function clearContent() { Object.values(CONTENT).forEach(c => c.clearFinder && c.clearFinder()); }
@@ -279,7 +282,8 @@ function renderTask(modId, lvlId, taskId) {
   const topics = topicsFor(modId, lvlId, taskId);
   const topicKey = `topics:${modId}/${lvlId}/${taskId}`;
   const savedTopics = Store.getSetting(topicKey, null);
-  const selected = new Set((savedTopics || [topics[0] && topics[0].id]).filter(id => topics.some(t => t.id === id)));
+  const usable = topics.filter(tp => !tp.pending);
+  const selected = new Set((savedTopics || [usable[0] && usable[0].id]).filter(id => usable.some(t => t.id === id)));
   view.innerHTML = `
     <div class="session-layout">
       <div class="panel session-head span-all">
@@ -292,7 +296,7 @@ function renderTask(modId, lvlId, taskId) {
       </div>
       ${topics.length ? `<div class="panel span-all" id="topicPanel">
         <div class="topic-head"><h3 class="panel-title">학습 주제</h3><button type="button" class="btn small ghost" id="topicAll">전체 선택</button></div>
-        <div class="topic-list">${topics.map(tp => `<label class="topic"><input type="checkbox" value="${esc(tp.id)}" ${selected.has(tp.id) ? "checked" : ""}><span>${esc(tp.name)}</span></label>`).join("")}</div>
+        <div class="topic-list">${topics.map(tp => `<label class="topic ${tp.pending ? "pending" : ""}"><input type="checkbox" value="${esc(tp.id)}" ${selected.has(tp.id) ? "checked" : ""} ${tp.pending ? "disabled" : ""}><span>${esc(tp.name)}${tp.pending ? ` <small>${esc(tp.pending)}</small>` : ""}</span></label>`).join("")}</div>
         <p class="muted small" style="margin:10px 0 0">1개만 고르거나 여러 개를 골라 섞어 연습할 수 있음</p>
       </div>` : ""}
       ${content ? `<div class="panel span-all"><h3 class="panel-title">세션 설정</h3>${content.settingsHtml(lvlId)}</div>` : `<div class="panel placeholder span-all">
@@ -310,10 +314,10 @@ function renderTask(modId, lvlId, taskId) {
   if (content) content.bindSettings(view);
   const readTopics = () => $$("#topicPanel input:checked").map(i => i.value);
   if ($("#topicAll")) {
-    const syncAll = () => { $("#topicAll").textContent = readTopics().length === topics.length ? "전체 해제" : "전체 선택"; };
+    const syncAll = () => { $("#topicAll").textContent = readTopics().length === usable.length ? "전체 해제" : "전체 선택"; };
     $("#topicAll").onclick = () => {
-      const all = readTopics().length !== topics.length;
-      $$("#topicPanel input").forEach(i => { i.checked = all; });
+      const all = readTopics().length !== usable.length;
+      $$("#topicPanel input:not([disabled])").forEach(i => { i.checked = all; });
       syncAll();
     };
     $("#topicPanel").addEventListener("change", syncAll);
@@ -322,7 +326,7 @@ function renderTask(modId, lvlId, taskId) {
   const btn = $("#startBtn");
   if (btn) btn.onclick = async () => {
     const chosen = readTopics();
-    if (topics.length && !chosen.length) { toast("학습 주제를 1개 이상 선택해야 함"); return; }
+    if (usable.length && !chosen.length) { toast("학습 주제를 1개 이상 선택해야 함"); return; }
     if (topics.length) Store.setSetting(topicKey, chosen);
     const options = content ? content.readSettings(view) : {};
     if (S.getActive()) {
@@ -727,7 +731,7 @@ function logItem(r) {
         <dt>일시정지</dt><dd>${r.pauses.length}회 · ${formatDuration(pauseSec)}${r.pauses.length ? `<br><span class="muted small">${r.pauses.map(p => `${hm(p.from)}~${hm(p.to)} ${reasons[p.reason] || p.reason}`).join(", ")}</span>` : ""}</dd>
         <dt>완료 횟수</dt><dd>${r.completedUnits}회</dd>
         ${r.options && r.options.timeLimit ? `<dt>설정</dt><dd>제한시간 ${r.options.timeLimit}초</dd>` : ""}
-        ${r.options && r.options.bpm ? `<dt>설정</dt><dd>시작 BPM ${r.options.bpm}</dd>` : ""}
+        ${r.options && r.options.bpm ? `<dt>설정</dt><dd>${r.options.style ? `${esc((PLAY_KEYS.find(k => k.pc === r.options.key) || {}).name || "")} 장조 · ${esc((PLAY_STYLES[r.options.style] || {}).name || r.options.style)} · ` : ""}시작 BPM ${r.options.bpm}</dd>` : ""}
       </dl>
       <div style="margin-top:12px"><button class="btn small danger" type="button" data-del="${esc(r.id)}">이 기록 삭제</button></div>
     </div>

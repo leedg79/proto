@@ -120,8 +120,14 @@ export function makeSpec(topic, root, rand, ctx) {
 
 // 12문제 묶음: 근음 12개를 섞어 한 번씩, 고른 주제를 고르게 섞음
 export function buildDeck(topics, rand = Math.random, size = 12) {
-  const roots = Array.from({ length: 12 }, (_, i) => i);
-  for (let i = roots.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [roots[i], roots[j]] = [roots[j], roots[i]]; }
+  // 근음: 12개를 섞어 한 번씩, 12개를 넘으면 새로 섞어 이어 붙임(같은 근음 연속 없음)
+  const roots = [];
+  while (roots.length < size) {
+    const r = Array.from({ length: 12 }, (_, i) => i);
+    for (let i = r.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [r[i], r[j]] = [r[j], r[i]]; }
+    if (roots.length && r[0] === roots[roots.length - 1]) [r[0], r[1]] = [r[1], r[0]];
+    roots.push(...r);
+  }
   const order = [];
   while (order.length < size) {
     const round = [...topics];
@@ -132,5 +138,12 @@ export function buildDeck(topics, rand = Math.random, size = 12) {
   for (let i = opens.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [opens[i], opens[j]] = [opens[j], opens[i]]; }
   let oi = 0;
   const ctx = { openPick: () => opens[oi++ % opens.length] };
-  return order.slice(0, size).map((topic, i) => makeSpec(topic, roots[i % 12], rand, ctx));
+  const deck = [];
+  for (let i = 0; i < size; i++) {
+    let spec = makeSpec(order[i], roots[i], rand, ctx);
+    // 재시도로 근음이 바뀌어 앞 코드와 같아진 경우 한 번 더 뽑음
+    if (deck.length && spec.root === deck[deck.length - 1].root && spec.topic !== "open") spec = makeSpec(order[i], (roots[i] + 7) % 12, rand, ctx);
+    deck.push(spec);
+  }
+  return deck;
 }

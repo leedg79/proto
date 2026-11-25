@@ -214,3 +214,79 @@ test("BPM Chord Finding: 중간에서 재개하면 그 코드부터, 완료는 1
   assert.equal(r.completedUnit, true);
   assert.equal(BPM.clampBpm(300), 160);
 });
+
+import * as PL from "../js/modules/chords/play-core.js";
+
+const allTopics = ["open", "triad", "power", "barre", "dim-aug-sus", "triad-inversion", "string-set-triad", "caged", "seventh",
+  "seventh-inversion", "shell", "drop2", "drop3", "tension", "substitute", "slash", "open-voicing", "quartal", "voice-leading"];
+
+test("Play Session: 모든 키·진행·주제에서 32마디, 마디당 4박, 모든 코드에 운지", () => {
+  for (const style of Object.keys(PL.STYLES)) for (const k of PL.KEYS) for (const t of allTopics) {
+    const plan = PL.buildPlan({ keyPc: k.pc, style, topics: [t] }, seeded(k.pc + 1));
+    assert.equal(plan.bars.length, 32);
+    assert.deepEqual(plan.bars.map(b => b.section).join(""), "A".repeat(16) + "B".repeat(8) + "A′".repeat(8));
+    for (const bar of plan.bars) {
+      assert.equal(bar.chords.reduce((a, c) => a + c.beats, 0), 4);
+      for (const c of bar.chords) {
+        assert.ok(c.voicing && c.voicing.notes.length >= 2, `${style} ${t} ${c.name}`);
+        if (t !== "quartal") {
+          const pcs = new Set(CHORD_TYPES[c.type].intervals.map(i => (c.rootPc + i) % 12));
+          if (c.bassPc != null) pcs.add(c.bassPc);
+          for (const n of c.voicing.notes) assert.ok(pcs.has(n.midi % 12), `${t} ${c.name} ${c.voicing.key}`);
+        }
+      }
+    }
+  }
+});
+
+test("Play Session: C키 Pop 화성 — A 섹션 I V vi IV", () => {
+  const plan = PL.buildPlan({ keyPc: 0, style: "pop", topics: ["triad"] }, seeded(1));
+  assert.deepEqual(plan.bars.slice(0, 4).map(b => b.chords[0].name), ["C", "G", "Am", "F"]);
+  const jazz = PL.buildPlan({ keyPc: 5, style: "jazz", topics: ["seventh"] }, seeded(1));
+  assert.deepEqual(jazz.bars.slice(0, 4).map(b => b.chords[0].name), ["Fmaj7", "Dm7", "Gm7", "C7"]);
+});
+
+test("Play Session: 대리 코드는 V7→I를 ♭II7로, 슬래시는 베이스 진행, sus·aug 변형", () => {
+  const sub = PL.buildPlan({ keyPc: 0, style: "pop", topics: ["substitute"] }, seeded(2));
+  assert.ok(sub.bars.flatMap(b => b.chords).some(c => c.name === "D♭7" && c.roman === "♭II7"));
+  const sl = PL.buildPlan({ keyPc: 0, style: "pop", topics: ["slash"] }, seeded(2));
+  assert.ok(sl.bars.flatMap(b => b.chords).some(c => c.name.includes("/")));
+  const das = PL.buildPlan({ keyPc: 0, style: "pop", topics: ["dim-aug-sus"] }, seeded(2));
+  const names = das.bars.flatMap(b => b.chords).map(c => c.name);
+  assert.ok(names.includes("Gsus4") && names.includes("Gaug"));
+  const ball = PL.buildPlan({ keyPc: 0, style: "ballad", topics: ["dim-aug-sus"] }, seeded(2)).bars.flatMap(b => b.chords).map(c => c.name);
+  assert.ok(ball.includes("Caug"));
+  // 섹션 경계를 넘는 V7→I도 대리 (Jazz A 끝 V7 → 다음 A의 I)
+  const jz = PL.buildPlan({ keyPc: 0, style: "jazz", topics: ["substitute"] }, seeded(2));
+  assert.equal(jz.bars[7].chords[0].name, "D♭7");
+});
+
+test("Play Session: 보이스 리딩은 코드 사이 이동이 '자주 쓰는 운지' 방식보다 작음", () => {
+  const avg = plan => { const cs = plan.bars.flatMap(b => b.chords); let s = 0; for (let i = 1; i < cs.length; i++) s += PL.voicingDistance(cs[i - 1].voicing, cs[i].voicing); return s / (cs.length - 1); };
+  let vl = 0, common = 0;
+  for (const k of PL.KEYS) {
+    vl += avg(PL.buildPlan({ keyPc: k.pc, style: "jazz", topics: ["voice-leading"] }, seeded(3)));
+    common += avg(PL.buildPlan({ keyPc: k.pc, style: "jazz", topics: ["seventh"] }, seeded(3)));
+  }
+  assert.ok(vl < common * 0.6, `${vl / 12} vs ${common / 12}`);
+});
+
+test("Play Session: 박 위치 계산(준비 4박, 2코드 마디는 2박씩)", () => {
+  const plan = PL.buildPlan({ keyPc: 0, style: "pop", topics: ["triad"] }, seeded(1));
+  assert.equal(PL.locate(plan, 0, 2).phase, "count");
+  const a = PL.locate(plan, 0, 4);
+  assert.deepEqual([a.barIdx, a.chordIdx, a.chordStart], [0, 0, true]);
+  // A′ 7마디째(전체 31번째 마디)는 IV-V 2코드
+  const s = PL.locate(plan, 30, 4 + 2);
+  assert.deepEqual([s.barIdx, s.chordIdx, s.chordStart], [30, 1, true]);
+  assert.equal(PL.locate(plan, 0, 4 + 32 * 4).phase, "done");
+  assert.equal(PL.nextChord(plan, 3, 0).name, "C");
+});
+
+test("연속 코드 찾기: 16개 무작위, 같은 근음 연속 없음", () => {
+  for (let seed = 1; seed <= 200; seed++) {
+    const deck = P.buildDeck(["triad", "power", "seventh"], seeded(seed), 16);
+    assert.equal(deck.length, 16);
+    for (let i = 1; i < 16; i++) assert.notEqual(deck[i].root, deck[i - 1].root, `seed ${seed} at ${i}`);
+  }
+});

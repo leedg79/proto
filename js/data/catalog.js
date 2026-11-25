@@ -19,7 +19,7 @@ export const UNIT = {
 // 세션 유형
 export const SESSION_TYPES = {
   finding: "찾기",
-  bpm: "BPM 연습",
+  bpm: "연속 찾기",
   play: "연주",
   block: "블록 연습",
   pattern: "패턴 연습",
@@ -30,7 +30,7 @@ export const SESSION_TYPES = {
 
 const CHORD_TASKS = [
   { id: "random-chord", name: "Random Chord Finding", type: "finding", unit: UNIT.mission },
-  { id: "bpm-chord", name: "BPM Chord Finding", type: "bpm", unit: UNIT.mission },
+  { id: "bpm-chord", name: "연속 코드 찾기 · Sequential Chord Finding", type: "bpm", unit: UNIT.mission },
   { id: "play-session", name: "Play Session", type: "play", unit: UNIT.mission },
   { id: "chord-dictionary", name: "Chord Dictionary", type: "reference", unit: UNIT.none, reference: true }
 ];
@@ -194,7 +194,7 @@ const LEVEL_TOPICS = {
   "chords/c2": tp([["barre", "바레·이동형 코드"], ["dim-aug-sus", "디미니시드·어그먼티드·서스펜디드"], ["triad-inversion", "트라이어드 전위"], ["string-set-triad", "현 그룹별 트라이어드"], ["caged", "CAGED"], ["seventh", "7th 코드"]]),
   "chords/c3": tp([["seventh-inversion", "7th 코드 전위"], ["shell", "Shell Voicing"], ["drop2", "Drop 2"], ["drop3", "Drop 3"], ["tension", "텐션(9·11·13)"]]),
   "chords/c4": tp([["substitute", "대리 코드"], ["slash", "슬래시 코드"], ["open-voicing", "Open Voicing"], ["quartal", "Quartal Voicing"]]),
-  "chords/c5": tp([["voice-leading", "보이스 리딩"], ["genre-comping", "장르별 컴핑"], ["chord-melody", "코드 멜로디"]]),
+  "chords/c5": tp([["voice-leading", "보이스 리딩"], ["genre-comping", "장르별 컴핑"], ["chord-melody", "코드 멜로디"]]).map(t => (t.id === "voice-leading" ? t : { ...t, pending: "악보 단계에서 추가" })),
   "scales/s1": tp([["maj", "메이저"], ["min", "마이너"], ["maj7", "maj7"], ["dom7", "7"], ["m7", "m7"], ["m7b5", "m7♭5"]]),
   "scales/s2": tp([["major-penta", "메이저 펜타토닉"], ["minor-penta", "마이너 펜타토닉"], ["blues", "블루스 스케일"]]),
   "scales/s3": tp([["major", "메이저"], ["natural-minor", "내추럴 마이너"], ["harmonic-minor", "하모닉 마이너"], ["melodic-minor", "멜로딕 마이너"]]),

@@ -1,4 +1,4 @@
-// BPM Chord Finding 화면: 메트로놈에 맞춰 2박마다 코드가 바뀜, 다음 코드 미리보기
+// 연속 코드 찾기(Sequential Chord Finding) 화면: 메트로놈에 맞춰 2박마다 코드가 바뀜, 다음 코드 미리보기
 
 import * as B from "./bpm-core.js";
 import { answersOf, describe } from "./prompts.js";
