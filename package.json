@@ -1,0 +1,9 @@
+{
+  "name": "fret-lab",
+  "private": true,
+  "type": "module",
+  "description": "FRET LAB 기타 학습·연습 관리 PWA (앱 실행에는 이 파일이 필요 없음, 개발용 테스트 설정)",
+  "scripts": {
+    "test": "node --test tests/*.test.mjs"
+  }
+}
