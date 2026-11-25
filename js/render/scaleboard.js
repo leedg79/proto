@@ -12,7 +12,7 @@ const STYLE = {
   ghostRoot: { fill: "none", stroke: "#a6f36b", text: "#a6f36b", r: 0.82 }
 };
 
-export function scaleBoardSvg(notes, { from = 0, to = 15, strings = [], labels = true } = {}) {
+export function scaleBoardSvg(notes, { from = 0, to = 15, strings = [], labels = true, path = null } = {}) {
   const frets = to - from + 1;           // 그릴 칸 수 (from=0이면 개방현 칸 포함)
   const w = 680, left = 44, right = 16, top = 26, bottom = 40;
   const fw = (w - left - right) / Math.max(1, from === 0 ? frets - 1 : frets);
@@ -42,6 +42,11 @@ export function scaleBoardSvg(notes, { from = 0, to = 15, strings = [], labels =
     const on = !focus || focus.has(s);
     o += `<line x1="${left}" y1="${yOf(s)}" x2="${w - right}" y2="${yOf(s)}" stroke="${on ? "#aab5c3" : "#4a5566"}" stroke-width="${1 + (s - 1) * 0.32}"/>`;
     o += `<text x="16" y="${yOf(s) + 6}" font-size="17" text-anchor="middle" fill="${on ? "#dfe5ec" : "#5f6c80"}">${s}</text>`;
+  }
+  // 경로 선 (음 순서대로)
+  if (path && path.length > 1) {
+    const pts = path.filter(p => p.f >= from && p.f <= to).map(p => `${xOfFret(p.f).toFixed(1)},${yOf(p.s).toFixed(1)}`).join(" ");
+    o += `<polyline points="${pts}" fill="none" stroke="#78a9ff" stroke-width="3.2" stroke-linejoin="round" stroke-linecap="round" stroke-opacity=".85" data-path="1"/>`;
   }
   // 흐린 음 먼저, 강조 음 나중에
   const rank = { ghost: 0, ghostRoot: 1, note: 2, root: 3, target: 4, active: 5 };

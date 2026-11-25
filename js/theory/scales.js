@@ -182,3 +182,122 @@ export function findOnString(pc, string) {
   for (let f = 0; f <= 15; f++) if (mod(MIDI_OPEN[string - 1] + f) === mod(pc)) out.push(f);
   return out;
 }
+
+// ── 블록 연결 경로 ──
+// 이웃한 블록을 이어 같은 음을 반복하지 않고 스케일을 연속으로 오르내리는 운지 경로
+// 규칙: 줄을 건너뛰지 않음, 한 줄에 4음 이하, 손 이동(프렛 변화)이 적은 쪽, 블록 구간 밖은 되도록 피함
+
+function poolOf(bs, rootPc, scaleId) {
+  const lo = Math.min(...bs.map(b => b.lo)), hi = Math.max(...bs.map(b => b.hi));
+  const inBlock = new Set(bs.flatMap(b => b.notes.map(n => n.s + "-" + n.f)));
+  const pcs = new Set(scalePcs(rootPc, scaleId));
+  const pool = [];
+  for (let s = 1; s <= 6; s++) for (let f = Math.max(0, lo - 1); f <= hi + 1; f++) {
+    const m = MIDI_OPEN[s - 1] + f;
+    if (pcs.has(mod(m))) pool.push({ s, f, midi: m, inBlock: inBlock.has(s + "-" + f) });
+  }
+  return pool;
+}
+
+// from/to: {s,f} 시작·끝 음, up: 상행 여부
+function routeSegment(pool, from, to, up) {
+  const fm = MIDI_OPEN[from.s - 1] + from.f, tm = MIDI_OPEN[to.s - 1] + to.f;
+  const pitches = [...new Set(pool.map(p => p.midi))].filter(m => (up ? m >= fm && m <= tm : m <= fm && m >= tm)).sort((a, b) => (up ? a - b : b - a));
+  const cands = pitches.map((m, i) => {
+    if (i === 0) return [{ ...from, midi: fm, inBlock: true }];
+    if (i === pitches.length - 1) return [{ ...to, midi: tm, inBlock: true }];
+    return pool.filter(p => p.midi === m);
+  });
+  // DP: 손 위치(4프렛 구간의 시작 p)를 상태로 둠. 구간 안의 음은 손 이동 없이, 구간을 옮기면(포지션 이동) 비용
+  // 상태 = (후보, 같은 줄 음 수, 그 줄 첫 프렛, 손 위치 p)
+  const neckDir = Math.sign(to.f - from.f);
+  const fits = (f, p) => f === 0 || (f >= p && f <= p + 3);
+  const stretch = (f, p) => f === p - 1 || f === p + 4;
+  const startPs = [];
+  for (let p = Math.max(0, from.f - 3); p <= Math.max(0, from.f); p++) startPs.push(p);
+  let layer = new Map();
+  for (const p of startPs) layer.set(`0|1|${from.f}|${p}`, { cost: Math.abs(p - Math.max(0, from.f - 1)) * 0.1, cand: cands[0][0], count: 1, first: from.f, p, prev: null });
+  for (let i = 1; i < pitches.length; i++) {
+    const next = new Map();
+    for (const st of layer.values()) {
+      for (const c of cands[i]) {
+        const sameString = c.s === st.cand.s;
+        const okString = up ? c.s === st.cand.s || c.s === st.cand.s - 1 : c.s === st.cand.s || c.s === st.cand.s + 1;
+        if (!okString) continue;
+        if (sameString && (up ? c.f <= st.cand.f : c.f >= st.cand.f)) continue;
+        const count = sameString ? st.count + 1 : 1;
+        if (count > 4) continue;
+        const first = sameString ? st.first : c.f;
+        if (Math.abs(c.f - first) > 4) continue; // 한 줄 안에서는 4프렛 이내
+        // 손 위치 후보: 그대로 / 이 음을 포함하도록 이동
+        const ps = new Set([st.p]);
+        if (c.f > 0) for (let p = Math.max(0, c.f - 3); p <= c.f; p++) ps.add(p);
+        for (const p of ps) {
+          let cost;
+          if (fits(c.f, p)) cost = 0;
+          else if (stretch(c.f, p)) cost = 1.5;
+          else continue;
+          if (p !== st.p) {
+            const d = p - st.p;
+            cost += 2 + Math.abs(d) + (neckDir !== 0 && Math.sign(d) === -neckDir ? 3 * Math.abs(d) : 0);
+          }
+          cost += (c.inBlock ? 0 : 2.5) + (count === 4 ? 1 : 0) + Math.abs(c.f - st.cand.f) * 0.1;
+          const key = `${cands[i].indexOf(c)}|${count}|${first}|${p}`;
+          const total = st.cost + cost;
+          if (!next.has(key) || next.get(key).cost > total) next.set(key, { cost: total, cand: c, count, first, p, prev: st });
+        }
+      }
+    }
+    if (!next.size) return null;
+    layer = next;
+  }
+  let best = null;
+  for (const st of layer.values()) if (!best || st.cost < best.cost) best = st;
+  const path = [];
+  for (let x = best; x; x = x.prev) path.push({ s: x.cand.s, f: x.cand.f, midi: x.cand.midi });
+  return path.reverse();
+}
+
+// 끝점 후보: 6번 현은 낮은 음부터, 1번 현은 높은 음부터 (가능한 가장 넓은 구간을 먼저 시도)
+const lows6 = b => b.notes.filter(n => n.s === 6).sort((a, c) => a.f - c.f);
+const highs1 = b => b.notes.filter(n => n.s === 1).sort((a, c) => c.f - a.f);
+
+function tryRoute(pool, froms, tos, up) {
+  for (const f of froms) for (const t of tos) {
+    const r = routeSegment(pool, f, t, up);
+    if (r) return r;
+  }
+  return null;
+}
+
+// 지판 위치 순서(낮은 프렛 → 높은 프렛)로 정렬한 블록. 연결은 이 순서의 이웃끼리
+export function neckOrder(rootPc, scaleId) {
+  return [...blocks(rootPc, scaleId)].sort((a, b) => a.lo - b.lo || a.index - b.index);
+}
+
+export function connectPath(rootPc, scaleId, startIndex, count, shape) {
+  const bs = neckOrder(rootPc, scaleId);
+  const sel = bs.slice(startIndex, startIndex + count);
+  if (sel.length < count) return null;
+  const pool = poolOf(sel, rootPc, scaleId);
+  const label = n => ({ ...n, ...noteAt(n.s, n.f, rootPc, scaleId) });
+  const segs = [];
+  if (count === 2) {
+    const seg = tryRoute(pool, lows6(sel[0]), highs1(sel[1]), true);
+    if (!seg) return null;
+    segs.push(shape === "down" ? seg.reverse() : seg);
+  } else if (shape === "updown") {
+    const a = tryRoute(pool, lows6(sel[0]), highs1(sel[1]), true);
+    const b = a && tryRoute(pool, [a[a.length - 1]], lows6(sel[2]), false);
+    if (!a || !b) return null;
+    segs.push(a, b.slice(1));
+  } else {
+    const a = tryRoute(pool, highs1(sel[0]), lows6(sel[1]), false);
+    const b = a && tryRoute(pool, [a[a.length - 1]], highs1(sel[2]), true);
+    if (!a || !b) return null;
+    segs.push(a, b.slice(1));
+  }
+  const notes = segs.flat().map(label);
+  const fr = notes.map(n => n.f);
+  return { blocks: sel, notes, lo: Math.min(...fr), hi: Math.max(...fr), label: sel.map(b => b.index).join("→") };
+}

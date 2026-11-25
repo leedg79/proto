@@ -466,6 +466,7 @@ h1, h2, h3 { margin: 0; line-height: 1.25; }
 .sb-step { min-width: 30px; height: 30px; font-size: 13px; }
 .sb-chip.now, .sb-step.now { border-color: var(--accent); color: var(--text); background: #a6f36b26; font-weight: 700; }
 .sb-chip.past, .sb-step.past { opacity: .5; }
+.sb-chip.wide { padding: 0 10px; }
 .sb-step.soon { border-color: var(--warn); color: var(--warn); animation: blink .4s ease-in-out infinite alternate; }
 @keyframes blink { from { opacity: 1; } to { opacity: .35; } }
 .sb-state { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin: 4px 2px 6px; }

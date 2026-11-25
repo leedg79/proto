@@ -17,7 +17,7 @@ import * as ScaleTransition from "./modules/scales/transition-view.js";
 import * as ScaleRoot from "./modules/scales/root-view.js";
 import { renderDictionary } from "./modules/chords/dictionary-view.js";
 
-const APP_VERSION = "1.6.0";
+const APP_VERSION = "1.6.1";
 
 // 구현된 과제의 연습 화면 (모듈/과제 → 화면 모듈)
 // 화면 모듈: settingsHtml, bindSettings, readSettings, mount, clearFinder

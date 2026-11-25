@@ -1,6 +1,6 @@
 // 블록 학습·블록 전환 진행 규칙 (순수 함수)
 
-import { blocks, sequence } from "../../theory/scales.js";
+import { blocks, sequence, connectPath, neckOrder } from "../../theory/scales.js";
 
 export const COUNT_IN = 4;
 export const BPM_MIN = 40, BPM_MAX = 200, BPM_DEFAULT = 60;
@@ -33,18 +33,24 @@ export function slotAt(cycle, startSlot, k) {
 }
 
 // ── Block Transition Practice ──
-// 블록 순서: 위로(1→N) / 아래로(N→1) / 왕복(1→N→2). 블록마다 barsPer마디. 한 바퀴 = 완료 1회
-export function transitionOrder(n, dir) {
-  const up = Array.from({ length: n }, (_, i) => i);
-  if (dir === "down") return up.slice().reverse();
-  if (dir === "updown") return [...up, ...up.slice(1, -1).reverse()];
-  return up;
-}
+// 이웃한 블록 2~3개를 잇는 경로(connectPath)를 지판 위치 순서대로 하나씩 연주
+// 경로마다 마디 처음에서 시작, 모든 경로를 마치면 완료 1회
 
-export function transitionAt(order, barsPer, startStep, beat) {
-  if (beat < COUNT_IN) return { phase: "count", countLeft: COUNT_IN - beat };
-  const b = beat - COUNT_IN;
-  const step = startStep + Math.floor(b / (4 * barsPer));
-  if (step >= order.length) return { phase: "end" };
-  return { phase: "play", step, block: order[step], stepStart: b % (4 * barsPer) === 0, barInStep: Math.floor((b % (4 * barsPer)) / 4) + 1 };
+export const SHAPES = { 2: [["up", "상행(6번 현 → 1번 현)"], ["down", "하행(1번 현 → 6번 현)"]], 3: [["updown", "올라갔다 내려오기"], ["downup", "내려갔다 올라오기"]] };
+
+export function transitionCycle(rootPc, scaleId, count = 2, shape = "up", perBeat = 1) {
+  const n = neckOrder(rootPc, scaleId).length;
+  const runs = [];
+  for (let i = 0; i + count <= n; i++) {
+    const p = connectPath(rootPc, scaleId, i, count, shape);
+    if (p) runs.push(p);
+  }
+  const slotsPerBar = 4 * perBeat;
+  const slots = [], runStart = [];
+  runs.forEach((r, ri) => {
+    runStart.push(slots.length);
+    r.notes.forEach((nt, ni) => slots.push({ block: ri, note: ni, s: nt.s, f: nt.f }));
+    while (slots.length % slotsPerBar) slots.push({ block: ri, note: -1 });
+  });
+  return { rootPc, scaleId, count, shape, perBeat, runs, slots, blockStart: runStart };
 }

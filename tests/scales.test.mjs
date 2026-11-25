@@ -77,15 +77,48 @@ test("Block Learning: 블록 5개(모드 7개) 사이클, 블록은 마디 처�
   assert.equal(BC.slotAt(c, c.blockStart[2], 4).slot.block, 2);
 });
 
-test("Block Transition: 순서·마디 수", () => {
-  assert.deepEqual(BC.transitionOrder(5, "up"), [0, 1, 2, 3, 4]);
-  assert.deepEqual(BC.transitionOrder(5, "down"), [4, 3, 2, 1, 0]);
-  assert.deepEqual(BC.transitionOrder(5, "updown"), [0, 1, 2, 3, 4, 3, 2, 1]);
-  const o = BC.transitionOrder(5, "up");
-  assert.equal(BC.transitionAt(o, 2, 0, 4).block, 0);
-  assert.equal(BC.transitionAt(o, 2, 0, 4 + 8).block, 1);
-  assert.equal(BC.transitionAt(o, 2, 0, 4 + 8).stepStart, true);
-  assert.equal(BC.transitionAt(o, 1, 0, 4 + 20).phase, "end");
+test("Block Transition: 이웃 블록을 잇는 경로, 같은 음 반복 없이 연속", () => {
+  const c = BC.transitionCycle(9, "minor-penta", 2, "up", 1);
+  assert.equal(c.runs.length, 4); // 지판 순서 5→1, 1→2, 2→3, 3→4
+  assert.deepEqual(c.runs.map(r => r.label), ["5→1", "1→2", "2→3", "3→4"]);
+  for (const r of c.runs) {
+    const m = r.notes.map(n => n.midi);
+    for (let i = 1; i < m.length; i++) assert.ok(m[i] > m[i - 1], "상행 연속");
+    assert.equal(r.notes[0].s, 6); assert.equal(r.notes.at(-1).s, 1);
+    // 줄을 건너뛰지 않음
+    for (let i = 1; i < r.notes.length; i++) assert.ok(r.notes[i - 1].s - r.notes[i].s <= 1);
+  }
+  // A 마이너 펜타 1→2: 6번 현 5프렛에서 시작해 1번 현 10프렛까지
+  const r12 = c.runs[1];
+  assert.equal(r12.notes[0].f, 5); assert.equal(r12.notes.at(-1).f, 10);
+  assert.ok(c.blockStart.every(i => i % 4 === 0));
+  // 하행은 상행의 역순
+  const d = BC.transitionCycle(9, "minor-penta", 2, "down", 1);
+  assert.deepEqual(d.runs[1].notes.map(n => n.midi), [...r12.notes.map(n => n.midi)].reverse());
+  // 3블록 왕복: 올라갔다 내려옴
+  const ud = BC.transitionCycle(0, "major", 3, "updown", 2);
+  for (const r of ud.runs) {
+    const m = r.notes.map(n => n.midi), top = m.indexOf(Math.max(...m));
+    assert.ok(top > 0 && top < m.length - 1);
+    for (let i = 1; i <= top; i++) assert.ok(m[i] > m[i - 1]);
+    for (let i = top + 1; i < m.length; i++) assert.ok(m[i] < m[i - 1]);
+  }
+});
+
+test("Block Transition: 모든 스케일·키·모양에서 경로 생성, 한 줄 4프렛 이내", () => {
+  for (const id of Object.keys(S.SCALES)) for (let pc = 0; pc < 12; pc++) for (const [cnt, shape] of [[2, "up"], [2, "down"], [3, "updown"], [3, "downup"]]) {
+    const c = BC.transitionCycle(pc, id, cnt, shape, 1);
+    assert.equal(c.runs.length, S.neckOrder(pc, id).length - cnt + 1, `${id} ${pc} ${shape}`);
+    for (const r of c.runs) {
+      // 같은 줄에서 연속으로 치는 음 묶음마다 4프렛 이내
+      let group = [r.notes[0]];
+      const check = g => assert.ok(Math.max(...g.map(n => n.f)) - Math.min(...g.map(n => n.f)) <= 4, `${id} ${pc} ${r.label} ${g[0].s}번 현`);
+      for (let i = 1; i < r.notes.length; i++) {
+        if (r.notes[i].s === group[0].s) group.push(r.notes[i]); else { check(group); group = [r.notes[i]]; }
+      }
+      check(group);
+    }
+  }
 });
 
 test("Interval Finding: 12문제, 근음 제외 도수, 정답은 지정 현의 해당 음", () => {

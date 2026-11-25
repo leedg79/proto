@@ -36,17 +36,17 @@ const CHORD_TASKS = [
 ];
 
 const SCALE_TASKS = [
-  { id: "interval-finding", name: "Scale Interval Finding", type: "finding", unit: UNIT.mission },
   { id: "block-learning", name: "Block Scale Learning", type: "block", unit: UNIT.blocks5 },
-  { id: "block-transition", name: "Block Transition Practice", type: "block", unit: UNIT.blocks5 },
+  { id: "block-transition", name: "Block Transition Practice", type: "block", unit: UNIT.mission },
+  { id: "interval-finding", name: "Scale Interval Finding", type: "finding", unit: UNIT.mission },
   { id: "block-root", name: "Block + Root Memorization", type: "block", unit: UNIT.mission }
 ];
 
 // S4 Modes는 블록 대신 시작음 기준 7개 포지션 단위
 const MODE_TASKS = [
-  { id: "interval-finding", name: "Scale Interval Finding", type: "finding", unit: UNIT.mission },
   { id: "block-learning", name: "Position Scale Learning", type: "block", unit: UNIT.positions7 },
-  { id: "block-transition", name: "Position Transition Practice", type: "block", unit: UNIT.positions7 },
+  { id: "block-transition", name: "Position Transition Practice", type: "block", unit: UNIT.mission },
+  { id: "interval-finding", name: "Scale Interval Finding", type: "finding", unit: UNIT.mission },
   { id: "block-root", name: "Position + Root Memorization", type: "block", unit: UNIT.mission }
 ];
 
