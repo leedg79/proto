@@ -41,9 +41,9 @@ function gridHtml(pattern, step = -1) {
     const b = i / 4;
     const h = pattern.find(x => Math.abs(x.b - b) < 1e-6);
     const mark = !h ? "" : h.mute ? "x" : h.up ? "↑" : "↓";
-    cells.push(`<span class="rg-c ${h ? "hit" : ""} ${h && h.acc ? "acc" : ""} ${Math.floor(i / 4) === step ? "now" : ""} ${i % 4 === 0 ? "beat" : ""}">${mark}</span>`);
+    cells.push(`<span class="rg-c ${h ? "hit" : ""} ${h && h.acc ? "acc" : ""} ${Math.floor(i / 4) === step ? "now" : ""} ${i % 4 === 0 ? "rg-beat" : ""}">${mark}</span>`);
   }
-  const labels = ["1", "e", "&", "a", "2", "e", "&", "a", "3", "e", "&", "a", "4", "e", "&", "a"].map((x, i) => `<span class="rg-l ${i % 4 === 0 ? "beat" : ""}">${x}</span>`).join("");
+  const labels = ["1", "e", "&", "a", "2", "e", "&", "a", "3", "e", "&", "a", "4", "e", "&", "a"].map((x, i) => `<span class="rg-l ${i % 4 === 0 ? "rg-beat" : ""}">${x}</span>`).join("");
   return `<div class="rgrid">${cells.join("")}</div><div class="rgrid lab">${labels}</div>`;
 }
 

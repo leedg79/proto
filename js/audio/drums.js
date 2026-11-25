@@ -38,4 +38,20 @@ export function drum(kind, when, vel, out) {
   else if (kind === "ohat") noiseHit(ctx, out, when, 0.2 * v, 0.22, "highpass", 6500);
   else if (kind === "ride") { noiseHit(ctx, out, when, 0.16 * v, 0.35, "bandpass", 5200, 0.9); noiseHit(ctx, out, when, 0.08 * v, 0.06, "highpass", 9000); }
   else if (kind === "click") noiseHit(ctx, out, when, 0.35 * v, 0.03, "highpass", 4000);
+  // 기타 퍼커시브·뮤트 커팅용
+  else if (kind === "chick") noiseHit(ctx, out, when, 0.32 * v, 0.05, "bandpass", 2600, 1.2);
+  else if (kind === "thump") {
+    const o = ctx.createOscillator(); o.type = "sine";
+    o.frequency.setValueAtTime(115, when); o.frequency.exponentialRampToValueAtTime(55, when + 0.12);
+    o.connect(env(ctx, out, when, 0.9 * v, 0.2)); o.start(when); o.stop(when + 0.22);
+    noiseHit(ctx, out, when, 0.12 * v, 0.03, "lowpass", 900);
+  } else if (kind === "slap") {
+    noiseHit(ctx, out, when, 0.55 * v, 0.12, "bandpass", 1500, 0.8);
+    noiseHit(ctx, out, when, 0.18 * v, 0.04, "highpass", 5000);
+  } else if (kind === "tap") {
+    const o = ctx.createOscillator(); o.type = "triangle";
+    o.frequency.setValueAtTime(420, when); o.frequency.exponentialRampToValueAtTime(260, when + 0.05);
+    o.connect(env(ctx, out, when, 0.45 * v, 0.07)); o.start(when); o.stop(when + 0.08);
+    noiseHit(ctx, out, when, 0.15 * v, 0.025, "bandpass", 3000, 1);
+  }
 }

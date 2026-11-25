@@ -48,7 +48,7 @@ function nearest(map, midi) {
 
 const rate = semis => Math.pow(2, semis / 12);
 
-// opts: gain, bend(반음), release(반음: 벤딩된 음에서 시작해 내려옴), slideFrom(midi), vib(true), soft(해머·풀), out(연결 노드)
+// opts: gain, bend(반음), release(반음: 벤딩된 음에서 시작해 내려옴), slideFrom(midi), vib(true), soft(해머·풀), pm(팜뮤트), out(연결 노드)
 export function playNote(inst, midi, when, dur, opts = {}) {
   const ctx = getAudioContext();
   const map = buffers[inst];
@@ -82,14 +82,19 @@ export function playNote(inst, midi, when, dur, opts = {}) {
   g.gain.linearRampToValueAtTime(vol, when + 0.005);
   g.gain.setValueAtTime(vol, when + dur);
   g.gain.exponentialRampToValueAtTime(0.0001, when + dur + 0.09);
-  src.connect(g); g.connect(opts.out || masterOut(ctx));
+  if (opts.pm) {
+    // 팜뮤트: 높은 배음을 깎고 짧게
+    const f = ctx.createBiquadFilter(); f.type = "lowpass"; f.frequency.value = 700; f.Q.value = 0.8;
+    src.connect(f); f.connect(g);
+  } else src.connect(g);
+  g.connect(opts.out || masterOut(ctx));
   src.start(when);
   src.stop(when + dur + 0.12);
   return src;
 }
 
 // 코드 스트럼: 낮은 음부터 조금씩 늦게
-export function strum(inst, midis, when, dur, { gain = 0.5, spread = 0.014, up = false, out } = {}) {
+export function strum(inst, midis, when, dur, { gain = 0.5, spread = 0.014, up = false, out, pm = false } = {}) {
   const list = up ? [...midis].reverse() : midis;
-  list.forEach((m, i) => playNote(inst, m, when + i * spread, dur, { gain, out }));
+  list.forEach((m, i) => playNote(inst, m, when + i * spread, dur, { gain, out, pm }));
 }

@@ -33,19 +33,22 @@ function candidates(rootPc, quality, kind) {
 const center = v => { const fr = v.notes.map(n => n.f).filter(f => f > 0); return fr.length ? (Math.min(...fr) + Math.max(...fr)) / 2 : 1.5; };
 
 // 진행 전체 운지: 앞 코드와 손 위치가 가까운 운지를 고름(시작은 3~8프렛 근처)
-export function compVoicings(genreId, key) {
-  const g = GENRES[genreId];
-  const bars = PROGRESSIONS[g.prog].bars.map(tok => { const c = parseRoman(tok); return { tok, rootPc: mod(key + c.root), quality: c.quality, name: chordName(key, tok) }; });
-  let hand = g.voicing === "open" ? 2 : 5.5;
+export function progVoicings(progId, key, kind) {
+  const bars = PROGRESSIONS[progId].bars.map(tok => { const c = parseRoman(tok); return { tok, rootPc: mod(key + c.root), quality: c.quality, name: chordName(key, tok) }; });
+  let hand = kind === "open" ? 2 : 5.5;
   const out = [];
   const cache = new Map();
   for (const b of bars) {
     if (cache.has(b.name)) { out.push(cache.get(b.name)); continue; }
-    const list = candidates(b.rootPc, b.quality, g.voicing);
+    const list = candidates(b.rootPc, b.quality, kind);
     const pick = list.sort((x, y) => Math.abs(center(x) - hand) - Math.abs(center(y) - hand))[0] || null;
     if (pick) hand = center(pick);
     cache.set(b.name, pick);
     out.push(pick);
   }
   return { bars, voicings: out };
+}
+export function compVoicings(genreId, key) {
+  const g = GENRES[genreId];
+  return progVoicings(g.prog, key, g.voicing);
 }

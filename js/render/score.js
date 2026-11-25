@@ -78,6 +78,7 @@ export function scoreSvg(el, events, { chords = [], ticks = BAR, flats = false, 
   const barW = (width - 20) / perRow;
   const chordAt = new Map(chords.map(c => [c.at, c.name]));
   let prevStaff = null, prevTab = null, prevEv = null;
+  const tagged = [];
 
   bars.forEach((list, b) => {
     const row = Math.floor(b / perRow), col = b % perRow;
@@ -126,6 +127,7 @@ export function scoreSvg(el, events, { chords = [], ticks = BAR, flats = false, 
         }
         tNotes.push(tn);
       }
+      if (!x2.pad && x2.idx >= 0) { if (sn) tagged.push([sn, x2.idx]); if (tn && !(tn instanceof V.GhostNote)) tagged.push([tn, x2.idx]); }
       if (x2.trip) {
         if (sn) tripBufS.push(sn);
         if (tn) tripBufT.push(tn);
@@ -163,6 +165,11 @@ export function scoreSvg(el, events, { chords = [], ticks = BAR, flats = false, 
     (sNotes.__ties || []).forEach(t => t.setContext(ctx).draw());
     (tNotes.__ties || []).forEach(t => t.setContext(ctx).draw());
   });
+  // 이벤트 번호를 음표 그림에 붙여 재생 중 강조(클래스 on)에 씀
+  for (const [n, idx] of tagged) {
+    const g = el.querySelector(`[id="vf-${n.getAttribute("id")}"]`);
+    if (g) g.setAttribute("data-ev", idx);
+  }
   const svg = el.querySelector("svg");
   if (svg) {
     svg.setAttribute("viewBox", `0 0 ${width} ${rows * rowH + 10}`);

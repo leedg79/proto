@@ -1,6 +1,6 @@
 // 오프라인 실행용 서비스 워커
 // 파일을 수정해 다시 배포할 때는 CACHE 이름의 숫자를 올려야 iPhone에 새 버전이 반영됨
-const CACHE = "fretlab-v2.2.0";
+const CACHE = "fretlab-v2.3.0";
 const ASSETS = [
   "./",
   "./index.html",
@@ -70,6 +70,13 @@ const ASSETS = [
   "./js/audio/backing-player.js",
   "./js/audio/lick-player.js",
   "./js/modules/jam/jam-view.js",
+  "./js/modules/rhythm/rhythm-data.js",
+  "./js/modules/rhythm/rhythm-core.js",
+  "./js/modules/rhythm/pattern-view.js",
+  "./js/modules/rhythm/reading-view.js",
+  "./js/modules/rhythm/phrase-view.js",
+  "./js/audio/rhythm-player.js",
+  "./js/render/rhythm.js",
   "./sounds/index.json",
   "./sounds/guitar/40.mp3",
   "./sounds/guitar/43.mp3",

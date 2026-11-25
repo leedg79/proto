@@ -146,7 +146,7 @@ test("병합 계획 계산", () => {
 
 test("레벨·완료 단위 정의가 결정 사항과 일치", () => {
   const counts = Object.fromEntries(MODULES.map(m => [m.id, m.levels.length]));
-  assert.deepEqual(counts, { notes: 2, chords: 5, rhythm: 4, scales: 4, licks: 7, ear: 4 });
+  assert.deepEqual(counts, { notes: 2, chords: 5, rhythm: 3, scales: 4, licks: 7, ear: 4 }); // Rhythm R3 Picking은 Technique로 옮김
   const notes = MODULES.find(m => m.id === "notes");
   assert.equal(notes.levels[0].tasks[0].unit, UNIT.noteCycle);
   const ear = MODULES.find(m => m.id === "ear");

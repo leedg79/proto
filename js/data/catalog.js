@@ -20,7 +20,10 @@ export const UNIT = {
   keys12: { kind: "cycle", size: 12, label: "12개 키 확인 = 1회" },
   none: { kind: "none", size: 0, label: "근음·코드 종류별 자주 쓰는 운지 검색 · 기록 없음" },
   listOnly: { kind: "none", size: 0, label: "목록 보기·좋음/삭제 후보 표시 · 기록 없음" },
-  licks10: { kind: "count", size: 10, label: "릭 10개 = 1회" }
+  licks10: { kind: "count", size: 10, label: "릭 10개 = 1회" },
+  pattern8: { kind: "mission", size: 1, label: "패턴 1개를 8마디(같이·혼자 치기) = 1회" },
+  reading10: { kind: "count", size: 10, label: "10문제 = 1회" },
+  phrase8: { kind: "mission", size: 1, label: "프레이즈 1개를 8마디(같이·혼자 치기) = 1회" }
 };
 
 // 세션 유형
@@ -61,6 +64,8 @@ function scaleTasks({ modes = false, apply = true } = {}) {
 
 // 이전 구성(v1.7.0까지)의 레벨·과제 이름: 학습일지에 남은 기록 표시용
 const LEGACY_SCALE_LEVELS = { s1: "S1", s2: "S2", s3: "S3", s4: "S4", s5: "S5", s6: "S6" };
+// Rhythm: 예전 R3 Picking은 Technique 모듈로 옮김(기록 표시용)
+const LEGACY_RHYTHM = { levels: { r3: "R3 Picking (Technique로 이동)" }, tasks: { picking: "피킹 연습 (Technique로 이동)" } };
 const LEGACY_SCALE_TASKS = {
   "interval-finding": "Scale Interval Finding",
   "block-learning": "Block Scale Learning",
@@ -131,28 +136,27 @@ export const MODULES = [
   {
     id: "rhythm",
     name: "Rhythm",
-    sub: "스트로크 · 컴핑 · 피킹",
-    stage: 6,
+    sub: "스트로크 · 컴핑 · 핑거 · 퍼커시브 · 프레이즈",
+    stage: 5,
     levels: [
       {
-        id: "r1", name: "R1 Strumming", desc: "4·8·16비트, 다운·업, 뮤트, 쉼표, 악센트, 싱코페이션, 장르별 스트로크",
-        tasks: [{ id: "strum-pattern", name: "스트로크 패턴 연습", type: "pattern", unit: UNIT.mission }]
-      },
-      {
-        id: "r2", name: "R2 Comping · Fingerstyle · Percussive", desc: "코드 리듬·커팅·뮤트, 아르페지오·베이스+코드, 바디 타격·팜뮤트·스트링 히트",
+        id: "r1", name: "R1 Strumming", desc: "4·8·16비트, 다운·업, 악센트, 뮤트, 쉼표, 싱코페이션, 셔플, 장르별 스트로크, 리듬 읽기",
         tasks: [
-          { id: "comping", name: "컴핑 연습", type: "pattern", unit: UNIT.mission },
-          { id: "fingerstyle", name: "핑거스타일 연습", type: "pattern", unit: UNIT.mission },
-          { id: "percussive", name: "퍼커시브 연습", type: "pattern", unit: UNIT.mission }
+          { id: "strum-pattern", name: "스트로크 패턴 · Strum Patterns", type: "pattern", unit: UNIT.pattern8 },
+          { id: "rhythm-reading", name: "리듬 읽기 · Rhythm Reading", type: "finding", unit: UNIT.reading10 }
         ]
       },
       {
-        id: "r3", name: "R3 Picking", desc: "코드톤·스케일 피킹, 얼터네이트, 스트링 스킵, 포지션 이동",
-        tasks: [{ id: "picking", name: "피킹 연습", type: "pattern", unit: UNIT.mission }]
+        id: "r2", name: "R2 Comping · Fingerstyle · Percussive", desc: "코드 리듬·커팅·뮤트·싱코페이션 컴핑, 아르페지오·베이스+코드, 바디 타격·스트링 히트·팜뮤트",
+        tasks: [
+          { id: "comping", name: "컴핑 리듬 · Comping", type: "pattern", unit: UNIT.pattern8 },
+          { id: "fingerstyle", name: "핑거스타일 · Fingerstyle", type: "pattern", unit: UNIT.pattern8 },
+          { id: "percussive", name: "퍼커시브 · Percussive", type: "pattern", unit: UNIT.pattern8 }
+        ]
       },
       {
-        id: "r4", name: "R4 Rhythm Picking Phrases", desc: "리프, 싱코페이션 프레이즈, 반복·변형, 코드·스케일 기반 프레이즈, 장르별 그루브",
-        tasks: [{ id: "phrase", name: "프레이즈 연습", type: "pattern", unit: UNIT.mission }]
+        id: "r4", name: "R3 Rhythm Phrases", desc: "리프, 싱코페이션 프레이즈, 반복·변형, 코드·스케일 기반 프레이즈",
+        tasks: [{ id: "phrase", name: "리듬 프레이즈 · Rhythm Phrases", type: "pattern", unit: UNIT.phrase8 }]
       }
     ]
   },
@@ -229,6 +233,7 @@ export function levelName(moduleId, levelId) {
   const l = findLevel(moduleId, levelId);
   if (l) return l.name;
   if (moduleId === "scales" && LEGACY_SCALE_LEVELS[levelId]) return `${LEGACY_SCALE_LEVELS[levelId]} (이전 구성)`;
+  if (moduleId === "rhythm" && LEGACY_RHYTHM.levels[levelId]) return LEGACY_RHYTHM.levels[levelId];
   return levelId;
 }
 
@@ -236,6 +241,7 @@ export function taskName(moduleId, levelId, taskId) {
   const t = findTask(moduleId, levelId, taskId);
   if (t) return t.name;
   if (moduleId === "scales" && LEGACY_SCALE_TASKS[taskId]) return `${LEGACY_SCALE_TASKS[taskId]} (이전 구성)`;
+  if (moduleId === "rhythm" && LEGACY_RHYTHM.tasks[taskId]) return LEGACY_RHYTHM.tasks[taskId];
   if (moduleId === "scales") { for (const lv of findModule("scales").levels) { const x = lv.tasks.find(t => t.id === taskId); if (x) return x.name; } }
   return taskId;
 }
@@ -259,8 +265,7 @@ const LEVEL_TOPICS = {
   "scales/mm": tp([["major", "메이저"], ["natural-minor", "내추럴 마이너"], ["harmonic-minor", "하모닉 마이너"], ["melodic-minor", "멜로딕 마이너"]]),
   "scales/md": tp(MODE_LIST),
   "scales/ct": tp([["maj", "메이저 코드톤"], ["min", "마이너 코드톤"], ["maj7", "maj7 코드톤"], ["dom7", "7 코드톤"], ["m7", "m7 코드톤"], ["m7b5", "m7♭5 코드톤"]]),
-  "rhythm/r1": tp([["4beat", "4비트"], ["8beat", "8비트"], ["16beat", "16비트"]]),
-  "rhythm/r3": tp([["chord-tone", "코드톤 피킹"], ["scale", "스케일 피킹"], ["alternate", "얼터네이트"], ["string-skip", "스트링 스킵"], ["position-shift", "포지션 이동"]]),
+  "rhythm/r1": tp([["4beat", "4비트"], ["8beat", "8비트"], ["16beat", "16비트"], ["accent", "악센트"], ["mute", "뮤트(칙)"], ["rest", "쉼표·끊어치기"], ["syncopation", "싱코페이션"], ["shuffle", "셔플"], ["genre", "장르별"]]),
   "rhythm/r4": tp([["riff", "리프"], ["syncopation", "싱코페이션 프레이즈"], ["repeat-vary", "반복·변형"], ["chord-based", "코드 기반"], ["scale-based", "스케일 기반"]]),
   "ear/e2": tp([["2-3", "2·3도"], ["4-5", "4·5도"], ["6-7", "6·7도"], ["octave-compound", "옥타브·복합 음정"]]),
   "ear/e4": tp([["blues", "Blues"], ["rock", "Rock"], ["funk", "Funk"], ["jazz", "Jazz"]])
@@ -273,8 +278,9 @@ const TASK_TOPICS = {
   "chords/c5/genre-comping": tp([["blues-shuffle", "블루스 셔플"], ["rock-8", "록 8비트"], ["funk-16", "펑크 16비트"], ["jazz-charleston", "재즈 스윙(찰스턴)"], ["jazz-4", "재즈 포 투 더 바"], ["bossa", "보사노바"], ["reggae", "레게 스캥크"], ["pop-strum", "팝 스트럼"]]),
   "chords/c5/chord-melody": tp([["ode-to-joy", "환희의 송가"], ["twinkle", "반짝반짝 작은 별"], ["jingle-bells", "징글벨 후렴"], ["frere-jacques", "프레르 자크"]]),
   "rhythm/r2/comping": tp([["chord-rhythm", "코드 리듬"], ["cutting", "커팅"], ["mute", "뮤트"], ["syncopation", "싱코페이션"]]),
-  "rhythm/r2/fingerstyle": tp([["arpeggio", "아르페지오"], ["bass-chord", "베이스+코드"]]),
-  "rhythm/r2/percussive": tp([["body-hit", "바디 타격"], ["palm-mute", "팜뮤트"], ["string-hit", "스트링 히트"]]),
+  "rhythm/r2/fingerstyle": tp([["arpeggio", "아르페지오"], ["bass-chord", "베이스+코드(트래비스)"]]),
+  "rhythm/r2/percussive": tp([["body-hit", "바디 타격"], ["string-hit", "스트링 히트(슬랩)"], ["palm-mute", "팜뮤트"]]),
+  "rhythm/r1/rhythm-reading": tp([["4beat", "4비트"], ["8beat", "8비트"], ["16beat", "16비트"], ["accent", "악센트"], ["mute", "뮤트(칙)"], ["rest", "쉼표·끊어치기"], ["syncopation", "싱코페이션"], ["shuffle", "셔플"]]),
   "ear/e3/chord-ear": tp([["triads", "트라이어드 5종"], ["sevenths", "7th 5종"], ["tensions", "텐션"], ["progressions", "코드 진행"]]),
   "ear/e3/melodic": [],
   "ear/e3/harmonic": []

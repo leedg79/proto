@@ -27,10 +27,13 @@ import { renderLickEditor } from "./modules/licks/editor-view.js";
 import { loadMyLicks, mergeMyLicks } from "./modules/licks/my-licks.js";
 import { getFlags as getLickFlags } from "./modules/licks/lick-flags.js";
 import { renderJam } from "./modules/jam/jam-view.js";
+import { makePatternTask } from "./modules/rhythm/pattern-view.js";
+import * as RhythmReading from "./modules/rhythm/reading-view.js";
+import * as RhythmPhrase from "./modules/rhythm/phrase-view.js";
 import { strum, loadInstrument } from "./audio/sampler.js";
 import { unlockAudio } from "./audio/context.js";
 
-const APP_VERSION = "2.2.0";
+const APP_VERSION = "2.3.0";
 
 // 구현된 과제의 연습 화면 (모듈/과제 → 화면 모듈)
 // 화면 모듈: settingsHtml, bindSettings, readSettings, mount, clearFinder
@@ -51,7 +54,13 @@ const CONTENT = {
   "licks/lick-move": LickMove,
   "licks/lick-vary": LickVary,
   "licks/lick-backing": LickBacking,
-  "chords/chord-melody": ChordMelody
+  "chords/chord-melody": ChordMelody,
+  "rhythm/strum-pattern": makePatternTask("strum"),
+  "rhythm/rhythm-reading": RhythmReading,
+  "rhythm/comping": makePatternTask("comp"),
+  "rhythm/fingerstyle": makePatternTask("finger"),
+  "rhythm/percussive": makePatternTask("perc"),
+  "rhythm/phrase": RhythmPhrase
 };
 // 과제에 pending이 있으면(예: Scales 코드 전환하며 익히기) 아직 연습 화면 없음
 const contentFor = (mod, task, level) => { const t = findTask(mod, level, task); return t && t.pending ? null : CONTENT[`${mod}/${task}`] || null; };
