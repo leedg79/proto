@@ -7,13 +7,16 @@ import * as J from "./core/journal.js";
 import * as B from "./core/backup.js";
 import * as Metro from "./audio/metronome.js";
 import * as NoteFinder from "./modules/notes/finder-view.js";
+import * as RandomChord from "./modules/chords/random-view.js";
+import { renderDictionary } from "./modules/chords/dictionary-view.js";
 
-const APP_VERSION = "1.2.0";
+const APP_VERSION = "1.3.0";
 
 // 구현된 과제의 연습 화면 (모듈/과제 → 화면 모듈)
 // 화면 모듈: settingsHtml, bindSettings, readSettings, mount, clearFinder
 const CONTENT = {
-  "notes/note-finder": NoteFinder
+  "notes/note-finder": NoteFinder,
+  "chords/random-chord": RandomChord
 };
 const contentFor = (mod, task) => CONTENT[`${mod}/${task}`] || null;
 function clearContent() { Object.values(CONTENT).forEach(c => c.clearFinder && c.clearFinder()); }
@@ -257,6 +260,19 @@ function renderTask(modId, lvlId, taskId) {
     return null;
   }
   const otherActive = !!active;
+  if (t.reference && modId === "chords") {
+    view.innerHTML = `
+      <div class="session-layout">
+        <div class="panel session-head span-all">
+          <div class="crumbs">${esc(m.name)} · ${esc(l.name)}</div>
+          <h1>${esc(t.name)}</h1>
+          <div class="tag-row"><span class="tag">참고 기능 · 기록 없음</span></div>
+        </div>
+        <div class="span-all" id="dictArea" style="display:grid;gap:14px"></div>
+      </div>`;
+    renderDictionary($("#dictArea"), { level: lvlId });
+    return m.name;
+  }
   const content = contentFor(modId, taskId);
   const topics = topicsFor(modId, lvlId, taskId);
   const topicKey = `topics:${modId}/${lvlId}/${taskId}`;
