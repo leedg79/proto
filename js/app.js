@@ -10,7 +10,7 @@ import * as NoteFinder from "./modules/notes/finder-view.js";
 import * as RandomChord from "./modules/chords/random-view.js";
 import { renderDictionary } from "./modules/chords/dictionary-view.js";
 
-const APP_VERSION = "1.3.0";
+const APP_VERSION = "1.3.1";
 
 // 구현된 과제의 연습 화면 (모듈/과제 → 화면 모듈)
 // 화면 모듈: settingsHtml, bindSettings, readSettings, mount, clearFinder

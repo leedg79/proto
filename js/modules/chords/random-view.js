@@ -3,6 +3,7 @@
 import * as R from "./random-core.js";
 import { answersOf, describe } from "./prompts.js";
 import { chordGrid } from "../../render/chordbox.js";
+import { rankVoicings } from "../../theory/voicings.js";
 import { getSetting, setSetting } from "../../core/storage.js";
 
 const KEY = "fretlab:rc";
@@ -104,10 +105,10 @@ export function mount(container, api) {
     $("#rcNext").classList.toggle("hidden", !c.revealed);
     const ans = $("#rcAnswer");
     if (c.revealed) {
-      const list = answersOf(c.spec);
+      const list = rankVoicings(answersOf(c.spec), { limit: 8 });
       ans.innerHTML = `
         <div class="answer-title">${esc(d.answerName)}${c.timedOut ? ' <span class="tag">시간 종료</span>' : ""}</div>
-        <div class="answer-note" style="margin:0 0 10px">구성음 ${esc(d.tones.join(" · "))} · 가능한 운지 ${list.length}개</div>
+        <div class="answer-note" style="margin:0 0 10px">구성음 ${esc(d.tones.join(" · "))} · 자주 쓰는 운지 ${list.length}개(왼쪽 위부터 많이 쓰는 순)</div>
         ${chordGrid(list)}`;
       ans.classList.remove("hidden");
     } else {

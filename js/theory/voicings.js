@@ -352,3 +352,60 @@ export function allVoicings(rootPc, type) {
   if (TENSION_SHAPES[type]) add("텐션", tensionVoicings(rootPc, type));
   return groups;
 }
+
+// ── 사용 빈도 순위 ──
+// 점수가 낮을수록 실제 연주에서 자주 쓰는 운지. 상위 limit개만 돌려줌(자주 쓰는 것이 앞)
+// 기준: 보이싱 종류의 일반적 사용 빈도 → 많이 쓰는 현 묶음 → 12프렛 이하 → 넓은 벌림·손가락 수 → 낮은 포지션
+const KIND_BASE = {
+  "오픈 코드": 0, "바레·이동형": 1, "파워 코드": 1, "CAGED": 1, "Shell": 1.5, "Drop 2": 1.5, "텐션": 1.5,
+  "트라이어드": 2, "슬래시 코드": 2, "Drop 3": 2.5, "Open Voicing": 3, "Quartal": 3
+};
+const sk = strings => [...strings].sort((a, b) => a - b).join("");
+const SET_PENALTY = {
+  "트라이어드": { "123": 0, "234": 0, "345": 1, "456": 2 },
+  "Drop 2": { "1234": 0, "2345": 0, "3456": 1.5 },
+  "Drop 3": { "2346": 0, "1235": 0.5 },
+  "Quartal": { "123": 1, "234": 0, "345": 0, "456": 1, "1234": 0.5, "2345": 0, "3456": 0.5 }
+};
+
+export function usageScore(v) {
+  let score = KIND_BASE[v.kind] ?? 3;
+  const strings = v.notes.map(n => n.s);
+  const pen = SET_PENALTY[v.kind];
+  if (pen) score += pen[sk(strings)] ?? 1;
+  if (v.kind === "CAGED") score += /^[CGD]폼/.test(v.detail) ? 1 : 0;
+  const fretted = v.notes.filter(n => n.f > 0).map(n => n.f);
+  const lo = fretted.length ? Math.min(...fretted) : 0;
+  const hi = fretted.length ? Math.max(...fretted) : 0;
+  if (hi > 12) score += 3; else if (lo > 9) score += 1;
+  if (hi - lo === 3) score += 0.75;
+  const atLo = fretted.filter(f => f === lo).length;
+  const fingers = fretted.length - (atLo >= 2 ? atLo - 1 : 0);
+  if (fingers === 4 && v.kind !== "바레·이동형") score += 0.25;
+  // 기본형(베이스 근음)이 조금 더 자주 쓰임
+  if (v.notes[0] && v.notes[0].label === "R") score -= 0.25;
+  return score + lo * 0.01;
+}
+
+// 같은 모양이 12프렛 위에 또 있으면 낮은 쪽만 남김
+function shapeKey(v) {
+  const fretted = v.notes.filter(n => n.f > 0).map(n => n.f);
+  const lo = fretted.length ? Math.min(...fretted) : 0;
+  const hasOpen = v.notes.some(n => n.f === 0);
+  return v.kind + "|" + v.notes.map(n => `${n.s}:${hasOpen ? n.f : n.f - lo}`).join(",");
+}
+
+export function rankVoicings(list, { limit = 8 } = {}) {
+  const scored = list.map(v => ({ v, score: usageScore(v) })).sort((a, b) => a.score - b.score);
+  const seen = new Set();
+  const out = [];
+  for (const { v } of scored) {
+    const k = shapeKey(v);
+    if (seen.has(k) || seen.has(v.key)) continue;
+    seen.add(k);
+    seen.add(v.key);
+    out.push(v);
+    if (out.length >= limit) break;
+  }
+  return out;
+}

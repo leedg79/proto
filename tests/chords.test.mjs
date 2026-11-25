@@ -162,3 +162,19 @@ test("Random Chord Finding: 12문제 정답 확인 = 완료 1회", () => {
   assert.equal(R.clampTime(1), 3);
   assert.equal(R.clampTime(99), 30);
 });
+
+test("사용 빈도 순위: 최대 8개, 중복 운지 없음, 오픈 코드·바레가 앞", () => {
+  for (let pc = 0; pc < 12; pc++) for (const t of ["maj", "m", "7", "m7", "maj7", "dim7", "9"]) {
+    const top = V.rankVoicings(V.allVoicings(pc, t).flatMap(g => g.list));
+    assert.ok(top.length >= 1 && top.length <= 8);
+    assert.equal(new Set(top.map(v => v.key)).size, top.length);
+  }
+  const c = V.rankVoicings(V.allVoicings(0, "maj").flatMap(g => g.list));
+  assert.equal(c[0].key, "x32010");
+  assert.equal(c[1].key, "x35553");
+  const g7 = V.rankVoicings(V.allVoicings(7, "7").flatMap(g => g.list));
+  assert.deepEqual(g7.slice(0, 2).map(v => v.key), ["320001", "353433"]);
+  // 15프렛 근처 운지는 낮은 위치에 같은 모양이 있으면 빠짐
+  const f = V.rankVoicings(V.closeTriads(5, "maj"));
+  assert.ok(f.every(v => Math.max(...v.notes.map(n => n.f)) <= 12));
+});
