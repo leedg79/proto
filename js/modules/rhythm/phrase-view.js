@@ -57,7 +57,7 @@ export function mount(container, api) {
       <p class="small rh-tip" id="phTip"></p>
       ${segHtml("phMode", MODES, st.mode)}
       <div class="jam-state muted small" id="phState">정지</div>
-      <div class="nf-actions" style="margin-top:8px"><button class="btn primary wide" id="phPlay" type="button">시작</button></div>
+      <div class="nf-actions" style="margin-top:8px"><button class="btn primary wide" id="phPlay" type="button" data-autostart>시작</button></div>
       <div class="btn-row" style="gap:8px;margin-top:8px">
         <button class="btn small" id="phPrev" type="button">← 이전</button>
         <button class="btn small" id="phNext" type="button">다음 →</button>

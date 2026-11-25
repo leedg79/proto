@@ -584,3 +584,12 @@ h1, h2, h3 { margin: 0; line-height: 1.25; }
 .score-wrap .on, .score-wrap .on path, .score-wrap .on text { fill: #e0a800 !important; stroke: #e0a800; }
 .rh .seg { margin-top: 10px; }
 .rh #rhMode button, .rh #phMode button { flex: 1 1 30%; }
+
+/* 세션: 연습 시작 대기, 세션 중 설정 변경 */
+.practice-gate { display: grid; gap: 10px; text-align: center; }
+.practice-gate p { margin: 0; color: #c9d1db; }
+.live-settings summary { cursor: pointer; font-weight: 800; font-size: 16px; list-style: none; display: block; }
+.live-settings summary small { display: block; font-weight: 600; margin-top: 2px; }
+.live-settings summary::-webkit-details-marker { display: none; }
+.live-settings summary::before { content: "⚙"; margin-right: 6px; }
+.live-settings[open] summary { margin-bottom: 4px; }

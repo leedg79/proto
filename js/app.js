@@ -12,7 +12,7 @@ import * as BpmChord from "./modules/chords/bpm-view.js";
 import * as PlaySession from "./modules/chords/play-view.js";
 import { KEYS as PLAY_KEYS, STYLES as PLAY_STYLES } from "./modules/chords/play-core.js";
 import * as ScaleShape from "./modules/scales/shape-view.js";
-import { ShapeRoot as ScaleRoot, RootCycle as ScaleRootCycle } from "./modules/scales/rootquiz-view.js";
+import { ShapeRoot as ScaleRoot } from "./modules/scales/rootquiz-view.js";
 import * as ScaleStart from "./modules/scales/start-view.js";
 import * as ScaleMode from "./modules/scales/mode-view.js";
 import * as ScaleTransition from "./modules/scales/transition-view.js";
@@ -33,7 +33,7 @@ import * as RhythmPhrase from "./modules/rhythm/phrase-view.js";
 import { strum, loadInstrument } from "./audio/sampler.js";
 import { unlockAudio } from "./audio/context.js";
 
-const APP_VERSION = "2.3.0";
+const APP_VERSION = "2.4.0";
 
 // 구현된 과제의 연습 화면 (모듈/과제 → 화면 모듈)
 // 화면 모듈: settingsHtml, bindSettings, readSettings, mount, clearFinder
@@ -44,7 +44,6 @@ const CONTENT = {
   "chords/play-session": PlaySession,
   "scales/shape-learning": ScaleShape,
   "scales/shape-root": ScaleRoot,
-  "scales/root-cycle": ScaleRootCycle,
   "scales/start-note": ScaleStart,
   "scales/mode-switch": ScaleMode,
   "scales/neck-transition": ScaleTransition,
@@ -179,9 +178,20 @@ function setTop(title, parts) {
   back.onclick = () => go(parentOf(parts));
 }
 
+let prevMain = null;
+function notifyAutoEnd(r) {
+  if (!r) return;
+  toast(r.saved ? `세션 자동 종료 · 완료 ${r.record.completedUnits}회 기록함` : "완료 1회 전이라 기록하지 않고 종료함");
+}
 function render() {
-  runCleanup();
   const parts = parseRoute();
+  // 세션 화면을 벗어나면 자동 종료(완료 1회 이상만 기록)
+  if (prevMain === "session" && parts[0] !== "session" && S.getActive()) {
+    metroStop(); holdScreen(false);
+    S.autoEnd("leave").then(r => { S.consumeAutoEnd(); notifyAutoEnd(r); });
+  }
+  prevMain = parts[0];
+  runCleanup();
   const [a, b, c, d] = parts;
   let title = "";
   try {
@@ -386,7 +396,7 @@ function renderTask(modId, lvlId, taskId) {
       <div class="span-all">
         ${otherActive ? `<div class="autopause" style="margin-bottom:10px">다른 세션이 진행 중임: ${esc(moduleName(active.module))} · ${esc(taskName(active.module, active.level, active.task))}</div>` : ""}
         <button class="btn primary wide" id="startBtn" type="button" style="min-height:58px;font-size:18px">세션 시작</button>
-        <p class="muted small" style="text-align:center;margin:8px 0 0">시작 버튼을 눌러야 시간 측정이 시작됨</p>
+        <p class="muted small" style="text-align:center;margin:8px 0 0">다음 화면에서 "연습 시작"을 눌러야 시간 측정이 시작됨. 세션 중에도 설정을 바꿀 수 있고, 화면을 나가면 자동 종료됨(완료 1회 이상일 때만 기록)</p>
       </div>`}
     </div>`;
   if (content) content.bindSettings(view);
@@ -421,8 +431,7 @@ function renderTask(modId, lvlId, taskId) {
     }
     clearContent();
     S.startSession({ module: modId, level: lvlId, task: taskId, type: t.type, options, topics: chosen });
-    holdScreen(true);
-    go("session", { replace: true });
+    go("session");
   };
   return m.name;
 }
@@ -435,6 +444,8 @@ function renderSession() {
   const t = findTask(s0.module, s0.level, s0.task);
   const unitLabel = t ? t.unit.label : "";
   const content = contentFor(s0.module, s0.task, s0.level);
+  const topics = topicsFor(s0.module, s0.level, s0.task);
+  const usable = topics.filter(tp => !tp.pending);
   const unitsPanel = `
         <div class="panel">
           <div class="units">
@@ -455,29 +466,46 @@ function renderSession() {
             <div class="seg" id="beatSeg">${[2, 3, 4, 6].map(n => `<button type="button" data-beats="${n}" class="${n === metro.beats ? "sel" : ""}">${n}/4</button>`).join("")}</div>
           </div>
         </div>`;
+  const tagsHtml = s => `<span class="tag accent">${esc(SESSION_TYPES[s.type] || s.type)}</span>${(s.topics || []).map(id => `<span class="tag">${esc(topicLabel(s.module, s.level, s.task, [id]))}</span>`).join("")}`;
   const head = `
       <div class="panel session-head span-all">
         <div class="crumbs">${esc(moduleName(s0.module))} · ${esc(levelName(s0.module, s0.level))}</div>
         <h1>${esc(taskName(s0.module, s0.level, s0.task))}</h1>
-        <div class="tag-row"><span class="tag accent">${esc(SESSION_TYPES[s0.type] || s0.type)}</span>${(s0.topics || []).map(id => `<span class="tag">${esc(topicLabel(s0.module, s0.level, s0.task, [id]))}</span>`).join("")}</div>
-      </div>
-      <div class="autopause span-all hidden" id="autoNote">앱을 벗어나 자동으로 일시정지됐음. 벗어나 있던 시간은 연습시간에 포함되지 않음. 재개를 누르면 이어서 측정함</div>`;
+        <div class="tag-row" id="sessTags">${tagsHtml(s0)}</div>
+      </div>`;
+  // 세션 중 설정 변경: 학습 주제 + 과제 설정
+  const live = content ? `
+      <details class="panel span-all live-settings" id="liveSettings">
+        <summary>설정 변경 <small class="muted">학습 주제·키·속도 등 — 바꾸고 "적용"</small></summary>
+        ${topics.length ? `<div class="topic-list" id="liveTopics" style="margin-top:12px">${topics.map(tp => `<label class="topic ${tp.pending ? "pending" : ""}"><input type="checkbox" value="${esc(tp.id)}" ${(s0.topics || []).includes(tp.id) ? "checked" : ""} ${tp.pending ? "disabled" : ""}><span>${esc(tp.name)}</span></label>`).join("")}</div>` : ""}
+        <div id="liveForm" style="margin-top:14px">${content.settingsHtml(s0.level)}</div>
+        <button class="btn primary wide" id="liveApply" type="button" style="margin-top:14px">적용</button>
+        <p class="muted small" style="margin:6px 0 0">적용하면 연습 화면이 새 설정으로 다시 시작됨. 연습시간과 완료 횟수는 이어짐</p>
+      </details>` : "";
+  const gate = `
+      <div class="panel span-all practice-gate" id="gate">
+        <p>준비가 되면 연습을 시작함. 이 버튼을 누른 순간부터 연습시간을 잼</p>
+        <button class="btn primary wide" id="practiceStart" type="button" style="min-height:58px;font-size:18px">연습 시작</button>
+      </div>`;
   view.innerHTML = content ? `
     <div class="session-layout content-layout">
       ${head}
       <div class="panel status-bar span-all">
-        <div class="status-time"><div class="state-label" id="stateLabel">RUNNING</div><div class="mid-time" id="bigTime">00:00</div></div>
+        <div class="status-time"><div class="state-label" id="stateLabel">READY</div><div class="mid-time" id="bigTime">00:00</div></div>
         <button class="btn warn" id="pauseBtn" type="button">일시정지</button>
         <button class="btn danger" id="endBtn" type="button">종료</button>
       </div>
+      ${live}
+      ${gate}
       <div class="panel content-panel" id="contentArea"></div>
       <div style="display:grid;gap:12px;align-content:start">${unitsPanel}</div>
     </div>` : `
     <div class="session-layout">
       ${head}
+      ${gate}
       <div>
         <div class="panel clock-panel">
-          <div class="state-label" id="stateLabel">RUNNING</div>
+          <div class="state-label" id="stateLabel">READY</div>
           <div class="big-time" id="bigTime">00:00</div>
           <div class="clock-sub" id="clockSub">실제 연습시간 (일시정지 제외)</div>
         </div>
@@ -490,21 +518,50 @@ function renderSession() {
         ${unitsPanel}
         ${metroPanel}
         <div class="panel placeholder">
-          <b>학습 콘텐츠는 ${(() => { const tk = findTask(s0.module, s0.level, s0.task); return tk && tk.pending ? esc(tk.pending) : `${m ? m.stage : "-"}단계에서 구현 예정`; })()}</b><br>
+          <b>학습 콘텐츠는 ${t && t.pending ? esc(t.pending) : `${m ? m.stage : "-"}단계에서 구현 예정`}</b><br>
           지금은 아래 시험용 버튼으로 완료 기록을 확인할 수 있음. 실제 과제가 붙으면 이 버튼은 자동 판정으로 바뀜
           <div style="margin-top:10px"><button class="btn small" id="unitBtn" type="button">완료 1회 기록 (시험용)</button></div>
         </div>
       </div>
     </div>`;
 
+  // 연습 화면 붙이기·다시 붙이기
+  let unmount = null;
+  const api = { getActive: S.getActive, elapsedMs: S.elapsedMs, addUnit: n => S.addCompletedUnit(n), toast };
+  const mountContent = () => {
+    if (!content) return;
+    if (unmount) { try { unmount(); } catch (_) {} }
+    $("#contentArea").innerHTML = "";
+    unmount = content.mount($("#contentArea"), api);
+  };
+  // 반주·연주형 과제는 "연습 시작"과 함께 재생 시작 (자동 시험에서는 window.__fretlabNoAutostart로 끔)
+  const autostart = () => { if (window.__fretlabNoAutostart) return; const b = $("#contentArea [data-autostart]"); if (b) b.click(); };
+  mountContent();
+  onCleanup(() => { if (unmount) try { unmount(); } catch (_) {} });
+
   if (content) {
-    onCleanup(content.mount($("#contentArea"), {
-      getActive: S.getActive,
-      elapsedMs: S.elapsedMs,
-      addUnit: n => S.addCompletedUnit(n),
-      toast
-    }));
+    content.bindSettings($("#liveForm"));
+    $("#liveApply").onclick = () => {
+      const chosen = $$("#liveTopics input:checked").map(i => i.value);
+      if (usable.length && !chosen.length) { toast("학습 주제를 1개 이상 선택해야 함"); return; }
+      const options = content.readSettings($("#liveForm"));
+      if (topics.length) Store.setSetting(`topics:${s0.module}/${s0.level}/${s0.task}`, chosen);
+      S.updateSessionMeta({ options, topics: topics.length ? chosen : undefined });
+      if (content.clearFinder) content.clearFinder();
+      mountContent();
+      $("#sessTags").innerHTML = tagsHtml(S.getActive());
+      $("#liveSettings").open = false;
+      toast("새 설정을 적용함");
+      if (S.getActive().status === "running") autostart();
+    };
   }
+
+  $("#practiceStart").onclick = () => {
+    S.beginPractice();
+    holdScreen(true);
+    paint();
+    autostart();
+  };
 
   const hasMetro = !!$("#metroPanel");
   const drawDots = () => {
@@ -520,15 +577,17 @@ function renderSession() {
   const paint = () => {
     const s = S.getActive();
     if (!s) return;
-    const running = s.status === "running";
+    const ready = s.status === "ready", running = s.status === "running";
     $("#bigTime").textContent = formatDuration(S.elapsedSec());
     const lab = $("#stateLabel");
-    lab.textContent = running ? "RUNNING" : "PAUSED";
+    lab.textContent = ready ? "READY" : running ? "RUNNING" : "PAUSED";
     lab.className = "state-label " + (running ? "running" : "paused");
     $("#pauseBtn").textContent = running ? "일시정지" : "재개";
     $("#pauseBtn").className = "btn " + (running ? "warn" : "primary");
+    $("#pauseBtn").classList.toggle("hidden", ready);
+    $("#gate").classList.toggle("hidden", !ready);
+    if ($("#contentArea")) $("#contentArea").classList.toggle("hidden", ready);
     $("#unitCount").textContent = s.completedUnits;
-    $("#autoNote").classList.toggle("hidden", !S.peekAutoPauseNotice());
     if (!hasMetro) return;
     const sw = $("#metroSwitch");
     sw.textContent = metro.on ? "ON" : "OFF";
@@ -547,7 +606,7 @@ function renderSession() {
       metroStop();
       S.pauseSession();
       holdScreen(false);
-    } else {
+    } else if (s.status === "paused") {
       S.resumeSession();
       holdScreen(true);
       if (metro.resumeAfterPause) await metroStart();
@@ -555,42 +614,43 @@ function renderSession() {
       paint();
     }
   };
-  if ($("#unitBtn")) $("#unitBtn").onclick = () => { S.addCompletedUnit(1); toast("완료 1회 기록함"); };
+  if ($("#unitBtn")) $("#unitBtn").onclick = () => {
+    if (S.getActive().status !== "running") { toast("연습을 시작한 뒤 기록할 수 있음"); return; }
+    S.addCompletedUnit(1); toast("완료 1회 기록함");
+  };
   $("#endBtn").onclick = async () => {
     const s = S.getActive();
     const sec = S.elapsedSec();
-    const k = await ask("세션 종료", `<p>실제 연습시간 <b>${formatDuration(sec)}</b>, 완료 <b>${s.completedUnits}회</b>로 기록함</p>`, [
-      { key: "save", label: "종료하고 기록", kind: "primary" },
-      { key: "discard", label: "기록하지 않고 버리기", kind: "danger" },
-      { key: "cancel", label: "계속 연습", kind: "ghost" }
-    ]);
-    if (k === "save") {
+    const back = `m/${s.module}/${s.level}`;
+    if (s.completedUnits >= 1) {
+      const k = await ask("세션 종료", `<p>실제 연습시간 <b>${formatDuration(sec)}</b>, 완료 <b>${s.completedUnits}회</b>로 기록함</p>`, [
+        { key: "save", label: "종료하고 기록", kind: "primary" },
+        { key: "cancel", label: "계속 연습", kind: "ghost" }
+      ]);
+      if (k !== "save") return;
       metroStop(); holdScreen(false);
       try {
         const rec = await S.endSession();
         clearContent();
         Store.requestPersistence();
         go(`done/${rec.id}`, { replace: true });
-      } catch (e) {
-        toast("저장 실패: " + e.message);
-      }
-    } else if (k === "discard") {
-      const k2 = await ask("기록 버리기", "<p>이 세션의 연습시간과 완료 횟수가 저장되지 않음. 되돌릴 수 없음</p>", [
-        { key: "yes", label: "버리기", kind: "danger" }, { key: "no", label: "취소", kind: "ghost" }
+      } catch (e) { toast("저장 실패: " + e.message); }
+    } else {
+      const k = await ask("세션 종료", `<p>아직 완료 기준(${esc(unitLabel)})을 채우지 못해 이 세션은 <b>기록되지 않음</b></p>`, [
+        { key: "discard", label: "기록 없이 종료", kind: "danger" },
+        { key: "cancel", label: "계속 연습", kind: "ghost" }
       ]);
-      if (k2 === "yes") {
-        const back = `m/${s.module}/${s.level}`;
-        metroStop(); holdScreen(false);
-        S.discardSession();
-        clearContent();
-        go(back, { replace: true });
-      }
+      if (k !== "discard") return;
+      metroStop(); holdScreen(false);
+      S.discardSession();
+      clearContent();
+      go(back, { replace: true });
     }
   };
   if (hasMetro) $("#metroSwitch").onclick = async () => {
     if (metro.on) metroStop();
     else {
-      if (S.getActive().status !== "running") { toast("세션을 재개한 뒤 메트로놈을 켤 수 있음"); return; }
+      if (S.getActive().status !== "running") { toast("연습을 시작(재개)한 뒤 메트로놈을 켤 수 있음"); return; }
       await metroStart();
     }
     paint();
@@ -988,8 +1048,14 @@ function updateDock() {
 // ───────────── 시작 ─────────────
 async function boot() {
   await Store.initStorage();
-  S.initSessions();
+  await S.initSessions();
+  const restored = S.consumeAutoEnd();
   S.subscribe(s => {
+    // 앱 이탈로 자동 종료됐는데 세션 화면에 있으면: 기록 화면 또는 과제 목록으로
+    if (!s && parseRoute()[0] === "session") {
+      const r = S.consumeAutoEnd();
+      if (r) { notifyAutoEnd(r); go(r.saved ? `done/${r.record.id}` : "", { replace: true }); }
+    }
     // 자동 일시정지 등으로 실행이 멈추면 메트로놈·화면 유지도 멈춤
     if (!s || s.status !== "running") {
       if (metro.on) { metro.resumeAfterPause = true; metroStop(); }
@@ -1007,9 +1073,9 @@ async function boot() {
   dock.onkeydown = e => { if (e.key === "Enter") go("session"); };
   window.addEventListener("hashchange", render);
   if (!location.hash) history.replaceState(null, "", "#/");
-  // 앱을 다시 열었을 때 진행 중 세션이 있으면 그 화면으로
-  if (S.getActive() && S.peekAutoPauseNotice() && parseRoute().length === 0) history.replaceState(null, "", "#/session");
+  if (parseRoute()[0] === "session") history.replaceState(null, "", "#/");
   render();
+  if (restored) notifyAutoEnd(restored);
 
   if ("serviceWorker" in navigator && location.protocol !== "file:") {
     navigator.serviceWorker.register("./sw.js").catch(() => {});

@@ -67,7 +67,7 @@ export function mount(container, api) {
       <div class="sb-state"><span class="state-label" id="sbtCap">READY</span><span class="muted small" id="sbtInfo"></span></div>
       <div class="fretboard sb-board" id="sbtBoard"></div>
       <div class="beats bf-beats" id="sbtBeats">${[0, 1, 2, 3].map(i => `<span class="beat ${i === 0 ? "accent" : ""}"></span>`).join("")}</div>
-      <div class="nf-actions" style="margin-top:12px"><button class="btn primary wide" id="sbtPlay" type="button">연주 시작</button></div>
+      <div class="nf-actions" style="margin-top:12px"><button class="btn primary wide" id="sbtPlay" type="button" data-autostart>연주 시작</button></div>
       <div class="bf-controls"><div class="bpm-row">
         <button type="button" data-bpm="-5">−5</button><button type="button" data-bpm="-1">−1</button>
         <div class="bpm-val"><b id="sbtBpmVal">${st.bpm}</b><span>BPM</span></div>

@@ -120,7 +120,7 @@ export function makePatternTask(kind) {
         <p class="small rh-tip" id="rhTip"></p>
         ${segHtml("rhMode", MODES, st.mode)}
         <div class="jam-state muted small" id="rhState">정지</div>
-        <div class="nf-actions" style="margin-top:8px"><button class="btn primary wide" id="rhPlay" type="button">시작</button></div>
+        <div class="nf-actions" style="margin-top:8px"><button class="btn primary wide" id="rhPlay" type="button" data-autostart>시작</button></div>
         <div class="btn-row" style="gap:8px;margin-top:8px">
           <button class="btn small" id="rhPrev" type="button">← 이전 패턴</button>
           <button class="btn small" id="rhNextP" type="button">다음 패턴 →</button>

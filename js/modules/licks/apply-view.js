@@ -17,6 +17,7 @@ import { segHtml, bindPicker, readSel, makeStore } from "../scales/common.js";
 
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const FLATS = [5, 10, 3, 8, 1, 6];
+const VTYPES = [["random", "무작위"], ...Object.entries(VARIATIONS).map(([k, v]) => [k, v.split(":")[0]])];
 const poolOf = s0 => { const p = licksFor(s0.level, s0.topics || []); return p.length ? p : licksFor(s0.level); };
 
 // ── 문제형(옮기기·변형) 공용 ──
@@ -25,21 +26,22 @@ function promptTask({ p, storeKey, kind }) {
     clearFinder: () => makeStore(storeKey).clear(),
     settingsHtml() {
       const t = clampTime(getSetting(`${p}.time`, 20));
-      return `${kind === "move" ? `<div class="field"><label>옮길 구간</label>${segHtml(`${p}Region`, REGIONS, getSetting(`${p}.region`, "random"))}</div>` : ""}
+      return `${kind === "move" ? `<div class="field"><label>옮길 구간</label>${segHtml(`${p}Region`, REGIONS, getSetting(`${p}.region`, "random"))}</div>` : `<div class="field"><label>변형 종류</label>${segHtml(`${p}Type`, VTYPES, getSetting(`${p}.type`, "random"))}</div>`}
         <div class="field" style="margin-top:14px"><label for="${p}Time">제한시간 <b id="${p}TimeOut">${t}초</b></label>
         <input id="${p}Time" type="range" min="${TIME_MIN}" max="${TIME_MAX}" step="1" value="${t}"></div>
         <p class="muted small" style="margin:4px 0 0">${kind === "move" ? "릭을 보고 다른 키·구간에서 같은 모양으로 치기. 모양(근음 위치·도수)은 그대로, 위치만 옮김" : "릭을 보고 지시대로 바꿔 치기. 확인 때 변형 악보와 소리가 나옴"}. 10개 = 완료 1회</p>`;
     },
     bindSettings(root) {
-      if (kind === "move") bindPicker(root, `${p}Region`);
+      if (kind === "move") bindPicker(root, `${p}Region`); else bindPicker(root, `${p}Type`);
       const r = root.querySelector(`#${p}Time`);
       r.oninput = () => { root.querySelector(`#${p}TimeOut`).textContent = r.value + "초"; };
     },
     readSettings(root) {
       const timeLimit = clampTime(root.querySelector(`#${p}Time`).value);
       const region = kind === "move" ? readSel(root, `${p}Region`, "v") || "random" : null;
-      setSetting(`${p}.time`, timeLimit); if (region) setSetting(`${p}.region`, region);
-      return { timeLimit, region };
+      const vtype = kind === "vary" ? readSel(root, `${p}Type`, "v") || "random" : null;
+      setSetting(`${p}.time`, timeLimit); if (region) setSetting(`${p}.region`, region); if (vtype) setSetting(`${p}.type`, vtype);
+      return { timeLimit, region, vtype };
     },
     mount(container, api) {
       const s0 = api.getActive();
@@ -52,10 +54,12 @@ function promptTask({ p, storeKey, kind }) {
           if (key === l.key) key = KEY_LIST[(KEY_LIST.indexOf(key) + 5) % 12];
           return { id: l.id, key, region };
         }
-        const types = variationTypes(realize(l));
-        return { id: l.id, type: types[Math.floor(Math.random() * types.length)] };
+        return { id: l.id, type: pickType(l, st ? st.vtype : o.vtype || "random") };
       });
-      let st = store.load(s0.id) || { deck: makeDeck(), idx: -1, done: 0, units: 0, timeLimit: clampTime(o.timeLimit || 20), cur: null };
+      // 고른 변형 종류를 이 릭에 쓸 수 없으면(예: 옥타브 이동이 지판 밖) 무작위
+      const pickType = (l, want) => { const types = variationTypes(realize(l)); return types.includes(want) ? want : types[Math.floor(Math.random() * types.length)]; };
+      let st = null;
+      st = store.load(s0.id) || { deck: makeDeck(), idx: -1, done: 0, units: 0, timeLimit: clampTime(o.timeLimit || 20), cur: null, vtype: o.vtype || "random" };
       const unplay = bindPlayButtons(container, id => LICKS.find(x => x.id === id), () => 80);
 
       container.innerHTML = `
@@ -63,6 +67,7 @@ function promptTask({ p, storeKey, kind }) {
           <div class="nf-meta"><span id="apNo"></span><span id="apProg"></span></div>
           <div class="prompt-card" id="apCard"><div class="prompt-caption">${kind === "move" ? "MOVE THIS LICK" : "VARY THIS LICK"}</div>
             <div class="prompt-main ap-main" id="apMain">-</div><div class="prompt-sub" id="apSub"></div></div>
+          ${kind === "vary" ? `<div class="field" style="margin-top:10px"><label>변형 종류 (바로 바뀜)</label>${segHtml("apType", VTYPES, st.vtype || "random")}</div>` : ""}
           <div id="apOrig"></div>
           <div class="timer-wrap"><div class="timer-track"><div id="apBar"></div></div><div class="timer-text" id="apTimer">0.0</div></div>
           <div class="nf-actions"><button class="btn primary wide" id="apReveal" type="button">정답 확인</button><button class="btn primary wide hidden" id="apNext" type="button">다음 →</button></div>
@@ -120,6 +125,15 @@ function promptTask({ p, storeKey, kind }) {
         $("#apReveal").disabled = !on; $("#apNext").disabled = !on;
         if (on && live && rem <= 0) reveal(true);
       }
+      if (kind === "vary") $("#apType").onclick = e => {
+        const b = e.target.closest("button[data-v]"); if (!b) return;
+        $("#apType").querySelectorAll("button").forEach(x => x.classList.toggle("sel", x === b));
+        const vtype = b.dataset.v;
+        setSetting(`${p}.type`, vtype);
+        // 지금 문제와 남은 문제의 변형 종류를 바로 바꿈
+        const deck = st.deck.map((it, i) => (i >= Math.max(0, st.idx) ? { ...it, type: pickType(LICKS.find(x => x.id === it.id), vtype) } : it));
+        st = { ...st, vtype, deck }; persist(); draw();
+      };
       $("#apReveal").onclick = () => reveal(false);
       $("#apNext").onclick = () => { stopLick(); next(); };
       draw(); tick();
@@ -157,7 +171,7 @@ export const LickBacking = {
         <div class="lb-phase" id="lbPhase">준비</div>
         <div id="lbCard"></div>
         <div class="jam-state muted small" id="lbState">정지</div>
-        <div class="nf-actions" style="margin-top:8px"><button class="btn primary wide" id="lbPlay" type="button">반주 시작</button></div>
+        <div class="nf-actions" style="margin-top:8px"><button class="btn primary wide" id="lbPlay" type="button" data-autostart>반주 시작</button></div>
         <div class="bf-controls"><div class="bpm-row">
           <button type="button" data-bpm="-5">−5</button>
           <div class="bpm-val"><b id="lbBpm">${st.bpm}</b><span>BPM</span></div>

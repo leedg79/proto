@@ -28,9 +28,9 @@ export function localIso(ms) {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}${sign}${p(Math.floor(a / 60))}:${p(a % 60)}`;
 }
 
-// 진행 중 세션 생성 (시작 버튼을 누른 순간에만 호출)
-export function createSession({ module, level, task, type, options, topics }, now, rand) {
-  return {
+// 세션 생성. ready=true면 "연습 시작"을 누르기 전 대기 상태(시간이 흐르지 않음)
+export function createSession({ module, level, task, type, options, topics }, now, rand, { ready = false } = {}) {
+  const s = {
     schema: SCHEMA_VERSION,
     id: newSessionId(now, rand),
     module, level, task, type,
@@ -43,6 +43,20 @@ export function createSession({ module, level, task, type, options, topics }, no
     completedUnits: 0,
     lastSeenAt: now
   };
+  return ready ? { ...s, status: "ready", segments: [] } : s;
+}
+
+// 대기 → 연습 시작: 이 순간부터 시간을 잼
+export function begin(s, now) {
+  if (s.status !== "ready") return s;
+  return { ...s, status: "running", startedAt: now, segments: [{ start: now, end: null }], lastSeenAt: now };
+}
+
+// 세션 중 설정·학습 주제 변경. 기록에는 세션 동안 고른 주제를 모두 남김
+export function updateMeta(s, { options, topics }) {
+  const used = [...(s.topicsUsed || s.topics || [])];
+  for (const t of topics || []) if (!used.includes(t)) used.push(t);
+  return { ...s, options: options ?? s.options, topics: topics ? [...topics] : s.topics, topicsUsed: used };
 }
 
 export function activeMs(s, now) {
@@ -138,7 +152,7 @@ export function finish(s, now) {
     pauses: pauses.map(p => ({ from: localIso(p.from), to: localIso(p.to), reason: p.reason })),
     completedUnits: s.completedUnits,
     options: s.options || {},
-    topics: s.topics || []
+    topics: s.topicsUsed || s.topics || []
   };
 }
 

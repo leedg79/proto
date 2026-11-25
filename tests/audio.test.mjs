@@ -49,3 +49,24 @@ test("음원 파일: 목록의 mp3가 모두 있음", () => {
   const sw = fs.readFileSync("sw.js", "utf8");
   for (const [k, list] of Object.entries(idx)) for (const m of list) assert.ok(sw.includes(`./sounds/${k}/${m}.mp3`), `sw ${k}/${m}`);
 });
+
+test("백킹 스타일 13종: 모든 진행에서 드럼·베이스·코드가 생기고 값이 정상", async () => {
+  const B = await import("../js/audio/backing.js");
+  assert.equal(Object.keys(B.STYLES).length, 13);
+  for (const st of Object.keys(B.STYLES)) for (const prog of Object.keys(B.PROGRESSIONS)) {
+    const s = B.buildBacking({ prog, key: 7, style: st }, () => 0.5);
+    for (const part of ["drums", "bass", "comp"]) assert.ok(s.events.some(e => e.part === part), `${st} ${prog} ${part}`);
+    for (const e of s.events) {
+      assert.ok(e.beat >= 0 && e.beat < s.beats, `${st} beat`);
+      for (const x of [e.dur ?? 0, e.midi ?? 0, ...(e.midis || [])]) assert.ok(Number.isFinite(x), `${st} ${prog}`);
+    }
+  }
+  // R&B·네오 소울·스무드 재즈·펑크는 9음을 얹은 보이싱
+  const nj = B.buildBacking({ prog: "major251", key: 0, style: "smooth-jazz" }).events.find(e => e.part === "comp");
+  assert.ok(nj.midis.some(m => m % 12 === 4));             // Dm7의 9음 E
+  // 네오 소울 16분 스윙, 슬로우 블루스는 셋잇단 위치를 그대로
+  assert.equal(B.swingBeat(1.25, "neo-soul"), 1.3);
+  assert.equal(B.swingBeat(1.5, "neo-soul"), 1.5);
+  const sb = B.buildBacking({ prog: "blues12", key: 9, style: "slow-blues" }).events.filter(e => e.part === "drums" && e.beat < 1);
+  assert.ok(sb.some(e => Math.abs(e.beat - 1 / 3) < 1e-9));
+});

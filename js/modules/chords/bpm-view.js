@@ -67,7 +67,7 @@ export function mount(container, api) {
       </div>
       <div class="bf-next"><span class="muted small">다음</span> <b id="bfNext">-</b> <span class="muted small" id="bfNextSub"></span></div>
       <div class="cycle-dots bf-dots" id="bfDots">${Array.from({ length: B.CHORDS_PER_PASS }, () => "<i></i>").join("")}</div>
-      <div class="nf-actions"><button class="btn primary wide" id="bfPlay" type="button">연주 시작</button></div>
+      <div class="nf-actions"><button class="btn primary wide" id="bfPlay" type="button" data-autostart>연주 시작</button></div>
       <div class="bf-diagram hidden" id="bfDiagram"></div>
       <div class="bf-controls">
         <div class="bpm-row">

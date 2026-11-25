@@ -154,15 +154,15 @@ test("레벨·완료 단위 정의가 결정 사항과 일치", () => {
   assert.equal(ear.levels[1].tasks[0].unit.size, 24);
   const scales = MODULES.find(m => m.id === "scales");
   assert.deepEqual(scales.levels.map(l => l.name), ["S1 Pentatonic & Blues", "S2 Major & Minor Family", "S3 Modes", "S4 Chord Tones"]);
-  const base = ["shape-learning", "shape-root", "root-cycle", "start-note", "neck-transition"];
+  const base = ["shape-learning", "shape-root", "start-note", "neck-transition"];
   assert.deepEqual(scales.levels[0].tasks.map(t => t.id), [...base, "chord-scale"]);
-  assert.deepEqual(scales.levels[2].tasks.map(t => t.id), ["shape-learning", "shape-root", "root-cycle", "start-note", "mode-switch", "neck-transition", "chord-scale"]);
+  assert.deepEqual(scales.levels[2].tasks.map(t => t.id), ["shape-learning", "shape-root", "start-note", "mode-switch", "neck-transition", "chord-scale"]);
   assert.deepEqual(scales.levels[3].tasks.map(t => t.id), base);
   assert.ok(!scales.levels[0].tasks.at(-1).pending);
   // 이전 구성 기록은 이름 뒤에 (이전 구성)
   assert.equal(taskName("scales", "s2", "block-learning"), "Block Scale Learning (이전 구성)");
   assert.equal(levelName("scales", "s2"), "S2 (이전 구성)");
-  assert.equal(taskName("scales", "s2", "root-cycle"), "근음 이동하며 익히기 · Root Cycle");
+  assert.equal(taskName("scales", "s2", "root-cycle"), "근음 이동하며 익히기 · Root Cycle (이전 구성)");   // 근음 위치 익히기로 합침
   const chords = MODULES.find(m => m.id === "chords");
   assert.deepEqual(chords.levels[4].tasks.map(t => t.id), ["play-session", "genre-comping", "chord-melody", "chord-dictionary"]);
 });
@@ -170,7 +170,7 @@ test("레벨·완료 단위 정의가 결정 사항과 일치", () => {
 test("학습 주제: 목록·기록·일간 집계", async () => {
   const { topicsFor, topicLabel } = await import("../js/data/catalog.js");
   assert.deepEqual(topicsFor("chords", "c1", "random-chord").map(t => t.name), ["오픈 코드", "메이저·마이너 트라이어드", "파워 코드"]);
-  assert.deepEqual(topicsFor("scales", "pb", "root-cycle").map(t => t.id), ["minor-penta", "major-penta", "blues"]);
+  assert.deepEqual(topicsFor("scales", "pb", "shape-root").map(t => t.id), ["minor-penta", "major-penta", "blues"]);
   assert.deepEqual(topicsFor("scales", "md", "mode-switch").map(t => t.id), ["ionian", "dorian", "phrygian", "lydian", "mixolydian", "aeolian", "locrian"]);
   assert.equal(topicsFor("scales", "ct", "start-note").length, 6);
   assert.equal(topicsFor("chords", "c5", "play-session")[0].name, "보이스 리딩");
@@ -190,4 +190,22 @@ test("학습 주제: 목록·기록·일간 집계", async () => {
   const topics = d.modules.chords.levels.c1.tasks["random-chord"].topics;
   assert.equal(topics["open+power"].sec, 160);   // 순서가 달라도 같은 조합
   assert.equal(topics["open"].sec, 30);
+});
+
+test("세션 대기(연습 시작 전)·연습 시작·세션 중 설정 변경", async () => {
+  const C = await import("../js/core/clock.js");
+  let s = C.createSession({ module: "scales", level: "pb", task: "shape-root", type: "scale", topics: ["minor-penta"], options: { order: "fourths" } }, 1000, Math.random, { ready: true });
+  assert.equal(s.status, "ready");
+  assert.equal(C.activeMs(s, 60_000), 0);                 // 대기 중에는 시간이 흐르지 않음
+  assert.equal(C.pause(s, 2000).status, "ready");          // 대기 중 일시정지 없음
+  s = C.begin(s, 20_000);
+  assert.equal(s.status, "running");
+  assert.equal(s.startedAt, 20_000);
+  assert.equal(C.activeMs(s, 50_000), 30_000);
+  s = C.updateMeta(s, { options: { order: "chromatic" }, topics: ["blues"] });
+  assert.deepEqual(s.topics, ["blues"]);
+  assert.equal(s.options.order, "chromatic");
+  const r = C.finish(C.addUnit(s, 1), 80_000);
+  assert.deepEqual(r.topics, ["minor-penta", "blues"]);    // 기록에는 고른 주제 모두
+  assert.equal(r.activeSec, 60);
 });

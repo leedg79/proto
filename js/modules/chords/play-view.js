@@ -78,7 +78,7 @@ export function mount(container, api) {
         <figure class="chord-cell"><figcaption class="pl-cap">지금 <b id="plNowName"></b></figcaption><div id="plNowBox"></div><figcaption id="plNowDetail"></figcaption></figure>
         <figure class="chord-cell next"><figcaption class="pl-cap">다음 <b id="plNextName"></b></figcaption><div id="plNextBox"></div><figcaption id="plNextDetail"></figcaption></figure>
       </div>
-      <div class="nf-actions"><button class="btn primary wide" id="plPlay" type="button">연주 시작</button></div>
+      <div class="nf-actions"><button class="btn primary wide" id="plPlay" type="button" data-autostart>연주 시작</button></div>
       <div class="pl-done hidden" id="plDone">
         <p><b>32마디 끝</b> · 코드표를 이미지로 저장할 수 있음. 32마디를 빠짐없이 연주했을 때만 완료로 기록함</p>
         <div class="btn-row"><button class="btn primary" id="plSave" type="button">코드표 PNG 저장</button><button class="btn" id="plAgain" type="button">같은 진행 다시</button><button class="btn" id="plNew" type="button">새 진행</button></div>

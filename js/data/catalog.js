@@ -47,14 +47,13 @@ const CHORD_TASKS = [
   { id: "chord-dictionary", name: "Chord Dictionary", type: "reference", unit: UNIT.none, reference: true }
 ];
 
-// Scales: 레벨 = 스케일 종류, 과제 = 숙련 단계(모양 → 근음 위치 → 근음 이동 → 시작음 → (모드 전환) → 블록 연결 → 화성 적용)
+// Scales: 레벨 = 스케일 종류, 과제 = 숙련 단계(모양 → 근음 위치(무작위·4도·반음) → 시작음 → (모드 전환) → 블록 연결 → 화성 적용)
 // 구체적인 스케일은 학습 주제로 고름
 function scaleTasks({ modes = false, apply = true } = {}) {
   const w = modes ? "포지션" : "블록";
   return [
     { id: "shape-learning", name: "기본 모양 익히기 · Shape Learning", type: "scale", unit: UNIT.shapeCycle },
-    { id: "shape-root", name: "근음 위치 익히기 · Shape + Root", type: "scale", unit: UNIT.keys12 },
-    { id: "root-cycle", name: "근음 이동하며 익히기 · Root Cycle", type: "scale", unit: UNIT.root12 },
+    { id: "shape-root", name: "근음 위치 익히기 · Root Position", type: "scale", unit: UNIT.root12 },
     { id: "start-note", name: "시작음 바꿔 치기 · Start Note", type: "finding", unit: UNIT.allDegrees },
     ...(modes ? [{ id: "mode-switch", name: "모드 전환 · Mode Switch", type: "scale", unit: UNIT.modeCycle }] : []),
     { id: "neck-transition", name: `${w} 연결 · ${modes ? "Position" : "Block"} Transition`, type: "scale", unit: UNIT.mission },
@@ -70,7 +69,8 @@ const LEGACY_SCALE_TASKS = {
   "interval-finding": "Scale Interval Finding",
   "block-learning": "Block Scale Learning",
   "block-transition": "Block Transition Practice",
-  "block-root": "Block + Root Memorization"
+  "block-root": "Block + Root Memorization",
+  "root-cycle": "근음 이동하며 익히기 · Root Cycle"
 };
 
 // Licks: 레벨 = 릭 분류, 학습 주제 = 하위 분류

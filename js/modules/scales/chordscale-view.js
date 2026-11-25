@@ -54,7 +54,7 @@ export function mount(container, api) {
       <p class="muted small" id="csTip"></p>
       <div class="seg wide-seg" id="csHintLive">${HINTS.map(([v, n]) => `<button type="button" data-v="${v}" class="${v === st.hint ? "sel" : ""}">${n}</button>`).join("")}</div>
       <div class="jam-state muted small" id="csState">정지</div>
-      <div class="nf-actions" style="margin-top:8px"><button class="btn primary wide" id="csPlay" type="button">반주 시작</button></div>
+      <div class="nf-actions" style="margin-top:8px"><button class="btn primary wide" id="csPlay" type="button" data-autostart>반주 시작</button></div>
       <div class="bf-controls"><div class="bpm-row">
         <button type="button" data-bpm="-5">−5</button>
         <div class="bpm-val"><b id="csBpm">${st.bpm}</b><span>BPM</span></div>

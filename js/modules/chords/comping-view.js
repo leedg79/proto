@@ -67,7 +67,7 @@ export function mount(container, api) {
       <div id="cmpGrid"></div>
       <p class="muted small" id="cmpTip"></p>
       <div class="jam-state muted small" id="cmpState">정지</div>
-      <div class="nf-actions" style="margin-top:8px"><button class="btn primary wide" id="cmpPlay" type="button">반주 시작</button></div>
+      <div class="nf-actions" style="margin-top:8px"><button class="btn primary wide" id="cmpPlay" type="button" data-autostart>반주 시작</button></div>
       <div class="btn-row" style="gap:8px;margin-top:8px"><button class="btn small" id="cmpDemo" type="button"></button></div>
       <div class="bf-controls"><div class="bpm-row">
         <button type="button" data-bpm="-5">−5</button><button type="button" data-bpm="-1">−1</button>

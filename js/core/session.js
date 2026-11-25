@@ -1,7 +1,8 @@
 // 공통 세션 관리자
 // - 세션은 사용자가 시작 버튼을 눌러야만 시작됨
-// - 진행 중 세션은 상태가 바뀔 때마다 즉시 저장 → 화면 이동·앱 재실행에도 유지
-// - 앱을 벗어나면(다른 앱 전환, 화면 잠금) 자동 일시정지, 돌아오면 사용자가 재개
+// - 세션 화면에서 "연습 시작"을 눌러야 시간이 흐름
+// - 세션 화면을 벗어나거나(다른 화면·다른 앱·화면 잠금·새로고침) 앱이 꺼지면 자동 종료:
+//   완료 1회 이상이면 기록, 아니면 기록하지 않음
 
 import * as C from "./clock.js";
 import { loadActive, saveActive, putSession } from "./storage.js";
@@ -44,23 +45,48 @@ function syncHeartbeat() {
   }
 }
 
-export function initSessions() {
+// 자동 종료 기록은 먼저 localStorage에 적어 두고(앱이 바로 꺼져도 남게) 저장이 끝나면 지움
+const PENDING = "fretlab:pendingRecords";
+const readPending = () => { try { return JSON.parse(localStorage.getItem(PENDING) || "[]"); } catch (_) { return []; } };
+async function flushPending() {
+  const list = readPending();
+  for (const r of list) { try { await putSession(r); } catch (e) { console.error(e); return; } }
+  localStorage.removeItem(PENDING);
+}
+let lastAutoEnd = null;   // { saved, record, units } 자동 종료 결과(화면 안내용)
+
+// 자동 종료: 완료 1회 이상이면 기록, 아니면 버림
+export async function autoEnd(reason = "leave") {
+  if (!state) return null;
+  const s = state;
+  if (s.completedUnits >= 1) {
+    const record = C.finish(s, now());
+    state = null; saveActive(null); syncHeartbeat();
+    lastAutoEnd = { saved: true, record, reason };
+    try { localStorage.setItem(PENDING, JSON.stringify([...readPending(), record])); } catch (_) {}
+    await flushPending();
+    emit();
+    return lastAutoEnd;
+  }
+  state = null; saveActive(null); syncHeartbeat();
+  lastAutoEnd = { saved: false, record: null, reason, units: 0 };
+  emit();
+  return lastAutoEnd;
+}
+export function consumeAutoEnd() { const v = lastAutoEnd; lastAutoEnd = null; return v; }
+
+export async function initSessions() {
+  await flushPending();
   const saved = loadActive();
   if (saved) {
-    const recovered = C.recover(saved, now());
-    if (recovered !== saved) autoPausedNotice = true;
-    state = recovered;
-    saveActive(state);
+    // 앱이 꺼졌다 다시 열림: 마지막으로 살아 있던 시각에 멈춘 것으로 보고 자동 종료
+    state = C.recover(saved, now());
+    await autoEnd("restore");
   }
   syncHeartbeat();
 
-  // 앱 이탈 시 자동 일시정지
-  const onHide = () => {
-    if (state && state.status === "running") {
-      autoPausedNotice = true;
-      commit(C.pause(state, now(), "auto"));
-    }
-  };
+  // 앱 이탈(다른 앱·화면 잠금·새로고침) → 자동 종료
+  const onHide = () => { if (state) autoEnd("hide"); };
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "hidden") onHide();
     else emit();
@@ -96,8 +122,18 @@ export function peekAutoPauseNotice() {
 export function startSession(meta) {
   if (state) throw new Error("이미 진행 중인 세션이 있음");
   autoPausedNotice = false;
-  commit(C.createSession(meta, now()));
+  commit(C.createSession(meta, now(), Math.random, { ready: true }));
   return state;
+}
+
+export function beginPractice() {
+  if (!state) return;
+  commit(C.begin(state, now()));
+}
+
+export function updateSessionMeta(meta) {
+  if (!state) return;
+  commit(C.updateMeta(state, meta));
 }
 
 export function pauseSession() {
