@@ -15,6 +15,7 @@
   --m-rhythm: #ffb86b;
   --m-scales: #c9a0ff;
   --m-ear: #6be3e0;
+  --m-licks: #ff8fb8;
   --sans: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", "Segoe UI", Roboto, sans-serif;
   --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
   --safe-top: env(safe-area-inset-top, 0px);
@@ -471,3 +472,96 @@ h1, h2, h3 { margin: 0; line-height: 1.25; }
 @keyframes blink { from { opacity: 1; } to { opacity: .35; } }
 .sb-state { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin: 4px 2px 6px; }
 .sb-board { background: #0f151f; border: 1px solid var(--line); border-radius: 14px; padding: 6px; }
+
+/* Scales 공용 연주 화면 */
+.sp-prompt { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin: 10px 0 4px; }
+.sp-prompt b { font-size: 34px; line-height: 1.1; color: var(--accent, #a6f36b); letter-spacing: .01em; }
+.sp-prompt span { color: var(--muted, #8f9bad); font-size: 14px; }
+.sb-board.checking { outline: 2px solid #a6f36b55; border-radius: 12px; }
+.st-run { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+.st-run span { font-size: 12px; padding: 2px 6px; border-radius: 6px; background: #1e2633; color: #c9d1db; }
+
+/* Licks */
+.lick-card { display: grid; gap: 10px; }
+.lick-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; flex-wrap: wrap; }
+.lick-id { font-size: 20px; color: var(--m-licks); letter-spacing: .02em; }
+.lick-title { font-size: 15px; color: var(--text, #e7edf4); }
+.lick-flags { display: flex; gap: 6px; }
+.flag-btn { min-height: 36px; padding: 0 12px; border-radius: 10px; border: 1px solid #3b4b5e; background: #151d29; color: #c9d1db; font-size: 14px; }
+.flag-btn.good.on { background: #a6f36b; color: #10180a; border-color: #a6f36b; }
+.flag-btn.del.on { background: #ff6b6b; color: #1d0606; border-color: #ff6b6b; }
+.tab-wrap { background: #0f151f; border: 1px solid #263244; border-radius: 12px; padding: 6px; overflow: hidden; }
+.tab-wrap svg { width: 100%; height: auto; display: block; }
+.lick-info { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 0; font-size: 14px; }
+.lick-info dt { color: #8f9bad; }
+.lick-info dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.deg-line { font-family: ui-monospace, Menlo, monospace; font-size: 13px; }
+.lk-nav { display: grid; grid-template-columns: 1fr 2fr; gap: 10px; }
+.lk-list { display: grid; gap: 6px; margin-top: 12px; }
+.lk-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 12px; border: 1px solid #263244; border-radius: 12px; background: #121a25; cursor: pointer; }
+.lk-row.del { border-color: #ff6b6b66; opacity: .7; }
+.lk-row.good { border-color: #a6f36b66; }
+.lk-row-main { display: grid; gap: 2px; min-width: 0; }
+.lk-row-main b { color: var(--m-licks); }
+.lk-row-main span { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lk-row-main small { color: #8f9bad; }
+.lk-row-flags { display: flex; gap: 4px; flex-shrink: 0; }
+.lk-row-flags .flag-btn { min-height: 32px; padding: 0 9px; font-size: 13px; }
+.lk-open { padding: 10px 4px 14px; border-bottom: 1px solid #263244; }
+.lk-subs { flex-wrap: wrap; }
+.lk-copybox { width: 100%; min-height: 90px; margin-top: 10px; background: #0f151f; color: #e7edf4; border: 1px solid #3b4b5e; border-radius: 10px; padding: 8px; font-size: 13px; }
+
+/* 백킹 트랙 · 소리 */
+.jam-prog { flex-wrap: wrap; }
+.jam-chart { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.jam-bar { border: 1px solid #263244; border-radius: 10px; padding: 8px 6px; background: #121a25; display: grid; gap: 2px; min-width: 0; }
+.jam-bar small { color: #5f6c80; font-size: 11px; }
+.jam-bar b { font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.jam-bar.now { border-color: var(--accent, #a6f36b); background: #1c2a17; }
+.jam-state { margin-top: 8px; text-align: center; }
+.jam-level { display: grid; grid-template-columns: 70px 1fr; align-items: center; gap: 10px; margin-top: 8px; }
+.lick-play-row { display: flex; align-items: center; gap: 10px; }
+.chord-cell[data-midis] { cursor: pointer; }
+.chord-cell.ringing { outline: 2px solid var(--accent, #a6f36b); border-radius: 10px; }
+
+.score-wrap { background: #f4f1ea; border-color: #d8d2c4; padding: 4px 2px; }
+.score-wrap svg { display: block; }
+
+/* 내 릭 편집기 */
+.ed { display: grid; gap: 12px; }
+.ed-head { display: flex; gap: 10px; align-items: center; }
+.ed-head b { color: var(--m-licks); font-size: 18px; flex-shrink: 0; }
+.ed-head input { flex: 1; min-width: 0; min-height: 40px; border-radius: 10px; border: 1px solid #3b4b5e; background: #0f151f; color: #e7edf4; padding: 0 10px; font-size: 15px; }
+.ed-row { display: grid; gap: 6px; }
+.ed-row > label { color: #8f9bad; font-size: 13px; }
+.ed-row select { min-height: 40px; border-radius: 10px; border: 1px solid #3b4b5e; background: #0f151f; color: #e7edf4; padding: 0 10px; font-size: 15px; }
+.ed-wrap { flex-wrap: wrap; }
+.ed-techs { display: flex; flex-wrap: wrap; gap: 6px; }
+.ed-techs button { min-height: 36px; padding: 0 11px; border-radius: 10px; border: 1px solid #3b4b5e; background: #151d29; color: #c9d1db; font-size: 14px; }
+.ed-techs button.on { background: #c9a0ff; color: #170c26; border-color: #c9a0ff; }
+.ed-board { overflow-x: auto; }
+.ed-shift { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; color: #8f9bad; font-size: 13px; }
+.ed-shift button { min-width: 44px; min-height: 34px; border-radius: 10px; border: 1px solid #3b4b5e; background: #151d29; color: #e7edf4; }
+.fr { display: grid; grid-template-columns: 18px repeat(13, minmax(0, 1fr)); gap: 3px; margin-bottom: 3px; }
+.fs { color: #8f9bad; font-size: 12px; align-self: center; }
+.fc { min-height: 34px; border-radius: 7px; border: 1px solid #263244; background: #10161f; color: #5f6c80; font-size: 12px; padding: 0; }
+.fc.in { background: #223044; color: #e7edf4; border-color: #3b4b5e; }
+.fc.root { background: #2c4a1c; color: #a6f36b; border-color: #a6f36b88; }
+.fc:active { background: #ffcf5c; color: #1d1600; }
+.ed-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.ed-actions .btn { flex: 1; }
+.ed-warn .notice { margin-top: 6px; }
+
+/* 장르별 컴핑 */
+.cmp-now { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 12px 0; }
+.cmp-now small { color: #8f9bad; }
+.cmp-box .chord-cell { margin: 0; }
+.rgrid { display: grid; grid-template-columns: repeat(16, minmax(0, 1fr)); gap: 2px; }
+.rgrid.lab { margin-top: 2px; }
+.rg-c { height: 34px; display: grid; place-items: center; border-radius: 5px; background: #121a25; color: #e7edf4; font-weight: 800; font-size: 16px; }
+.rg-c.beat { box-shadow: inset 2px 0 0 #3b4b5e; }
+.rg-c.hit { background: #2a3a52; }
+.rg-c.acc { background: #78a9ff; color: #08111f; }
+.rg-c.now { outline: 2px solid #ffcf5c; }
+.rg-l { text-align: center; font-size: 10px; color: #5f6c80; }
+.rg-l.beat { color: #c9d1db; font-weight: 700; }

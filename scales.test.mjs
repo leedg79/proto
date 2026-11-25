@@ -60,82 +60,118 @@ test("도수 표기·연주 순서", () => {
 });
 
 import * as BC from "../js/modules/scales/block-core.js";
-import * as IC from "../js/modules/scales/interval-core.js";
+import * as DR from "../js/modules/scales/drill-core.js";
+import { buildSlots } from "../js/modules/scales/seg-player.js";
 
-test("Block Learning: 블록 5개(모드 7개) 사이클, 블록은 마디 처음에서 시작", () => {
-  const c = BC.learningCycle(9, "minor-penta", "updown", 1);
-  assert.equal(c.blocks.length, 5);
-  assert.ok(c.blockStart.every(i => i % 4 === 0));
-  assert.equal(c.slots.filter(s => s.note >= 0).length, 5 * 23);
-  const c2 = BC.learningCycle(2, "dorian", "up", 2);
-  assert.equal(c2.blocks.length, 7);
-  assert.ok(c2.blockStart.every(i => i % 8 === 0));
-  assert.equal(BC.slotAt(c, 0, 3).phase, "count");
-  assert.equal(BC.slotAt(c, 0, 4).slot.note, 0);
-  assert.equal(BC.slotAt(c, 0, 4 + c.slots.length).phase, "end");
-  // 중간 블록부터 재생
-  assert.equal(BC.slotAt(c, c.blockStart[2], 4).slot.block, 2);
+test("S1 모양 익히기: 블록 5개(모드 7개), 구간은 마디 처음에서, 근음만·이름만은 확인 마디 추가", () => {
+  const a = DR.shapeSegments(9, "minor-penta", "updown");
+  assert.equal(a.segments.length, 5);
+  assert.equal(a.segments[0].notes.length, 23); // 12음 왕복
+  assert.equal(DR.shapeSegments(2, "dorian").segments.length, 7);
+  const all = buildSlots(a.segments, 1, "all");
+  assert.ok(all.segStart.every(i => i % 4 === 0));
+  assert.equal(all.slots.length, 5 * 24);
+  const hide = buildSlots(a.segments, 2, "hide");
+  assert.equal(hide.slots.filter(x => x.note === -2).length, 5 * 8);
+  assert.ok(hide.segStart.every(i => i % 8 === 0));
 });
 
-test("Block Transition: 이웃 블록을 잇는 경로, 같은 음 반복 없이 연속", () => {
-  const c = BC.transitionCycle(9, "minor-penta", 2, "up", 1);
-  assert.equal(c.runs.length, 4); // 지판 순서 5→1, 1→2, 2→3, 3→4
-  assert.deepEqual(c.runs.map(r => r.label), ["5→1", "1→2", "2→3", "3→4"]);
-  for (const r of c.runs) {
-    const m = r.notes.map(n => n.midi);
-    for (let i = 1; i < m.length; i++) assert.ok(m[i] > m[i - 1], "상행 연속");
-    assert.equal(r.notes[0].s, 6); assert.equal(r.notes.at(-1).s, 1);
-    // 줄을 건너뛰지 않음
-    for (let i = 1; i < r.notes.length; i++) assert.ok(r.notes[i - 1].s - r.notes[i].s <= 1);
+test("근음 문제: 고른 구간 안에 모양 배치, 4도·반음·무작위 순서", () => {
+  assert.deepEqual(DR.rootOrder("fourths", 0).slice(0, 4), [0, 5, 10, 3]);
+  assert.deepEqual(DR.rootOrder("chromatic", 9).slice(0, 3), [9, 10, 11]);
+  assert.deepEqual([...DR.rootOrder("random", 0, () => 0.5)].sort((x, y) => x - y), [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
+  for (const id of Object.keys(S.SCALES)) for (const [rid, lo, hi] of [["0-4", 0, 4], ["5-9", 5, 9], ["12-16", 12, 16]]) {
+    const d = DR.rootDeck({ scaleId: id, order: "fourths", startPc: 9, regionId: rid });
+    assert.equal(d.length, 12);
+    for (const p of d) {
+      assert.ok(p.lo >= lo - 2 && p.hi <= hi + 2, `${id} ${rid} ${p.main} ${p.lo}-${p.hi}`);
+      assert.ok(p.shape.some(n => n.root));
+      assert.equal(p.region.label, `${lo}~${hi}프렛`);
+    }
   }
-  // A 마이너 펜타 1→2: 6번 현 5프렛에서 시작해 1번 현 10프렛까지
-  const r12 = c.runs[1];
-  assert.equal(r12.notes[0].f, 5); assert.equal(r12.notes.at(-1).f, 10);
-  assert.ok(c.blockStart.every(i => i % 4 === 0));
-  // 하행은 상행의 역순
-  const d = BC.transitionCycle(9, "minor-penta", 2, "down", 1);
-  assert.deepEqual(d.runs[1].notes.map(n => n.midi), [...r12.notes.map(n => n.midi)].reverse());
-  // 3블록 왕복: 올라갔다 내려옴
-  const ud = BC.transitionCycle(0, "major", 3, "updown", 2);
-  for (const r of ud.runs) {
-    const m = r.notes.map(n => n.midi), top = m.indexOf(Math.max(...m));
+  const r = DR.rootDeck({ scaleId: "minor-penta", regionId: "random" }, () => 0.99);
+  assert.equal(r[0].region.id, "12-16");
+});
+
+test("S3 시작음: 모든 음에서 한 번씩, 시작음에서 한 옥타브, 관계 스케일", () => {
+  for (const id of Object.keys(S.SCALES)) for (let pc = 0; pc < 12; pc++) {
+    const deck = DR.startDeck(pc, id);
+    const n = S.SCALES[id].steps.length;
+    assert.equal(deck.length, n, `${id} ${pc}`);
+    assert.deepEqual(deck.map(p => p.semi).sort((x, y) => x - y), [...S.SCALES[id].steps].sort((x, y) => x - y));
+    for (const p of deck) {
+      assert.equal(p.notes[0].s, p.s); assert.equal(p.notes[0].f, p.f);
+      assert.equal(p.notes.length, 2 * n + 1);
+      const m = p.notes.map(x => x.midi), top = p.up ? Math.max(...m) : Math.min(...m);
+      assert.equal(Math.abs(top - m[0]), 12);
+      assert.equal(m.at(-1), m[0]);
+      assert.equal(((m[0] - pc) % 12 + 12) % 12, p.semi);
+    }
+  }
+  assert.equal(DR.relatedScale(2, "dorian", 5), "G Mixolydian");
+  assert.equal(DR.relatedScale(2, "dorian", 3), "F Lydian");
+  assert.equal(DR.relatedScale(9, "minor-penta", 3), "C 메이저 펜타토닉");
+});
+
+test("모드 문제: 밝은 순서, 이웃 모드는 한 음만 다름, 같은 구간", () => {
+  const order = DR.modeOrder(["dorian", "ionian", "lydian", "locrian", "phrygian", "aeolian", "mixolydian"], "bright");
+  assert.deepEqual(order, DR.BRIGHTNESS);
+  const m = DR.modeDeck({ rootPc: 9, modes: order, regionId: "5-9" });
+  assert.equal(m[0].changed.length, 0);
+  for (let i = 1; i < 7; i++) {
+    assert.ok(m[i].answer.includes("바뀐 음:") && !m[i].answer.includes("·"), `${m[i].main}: ${m[i].answer}`);
+    assert.ok(m[i].changed.length >= 1);
+    assert.ok(m[i].lo >= 3 && m[i].hi <= 11, `${m[i].main} ${m[i].lo}-${m[i].hi}`);
+  }
+  assert.equal(m[1].answer, "Lydian에서 바뀐 음: 4");
+  assert.deepEqual(DR.modeOrder(["ionian", "dorian"], "dark"), ["dorian", "ionian"]);
+  assert.equal(S.degreeOf(6, "lydian"), "♯4");
+});
+
+test("시작음: 고른 구간 안에서 시작", () => {
+  for (const id of ["minor-penta", "major", "dorian", "m7"]) for (const [rid, lo, hi] of [["0-4", 0, 4], ["9-13", 9, 13]]) {
+    const d = DR.startDeck(4, id, Math.random, rid);
+    assert.equal(d.length, S.SCALES[id].steps.length);
+    for (const p of d) assert.ok(p.f >= lo && p.f <= hi, `${id} ${rid} ${p.s}-${p.f}`);
+  }
+});
+
+test("Block Transition: 블록 1에서 시작, 중간 줄 슬라이드로 블록 2로 넘어가 최고음까지", () => {
+  const c = BC.transitionCycle(9, "minor-penta", 2, "up", 1, [0, 0, 0, 0]);
+  assert.deepEqual(c.runs.map(r => r.label), ["5→1", "1→2", "2→3", "3→4"]);
+  const r = c.runs[1]; // A 마이너 펜타 1→2, 4번 줄에서 전환
+  assert.deepEqual(r.notes.map(n => `${n.s}-${n.f}`), ["6-5", "6-8", "5-5", "5-7", "4-5", "4-7", "4-10", "3-7", "3-9", "2-8", "2-10", "1-8", "1-10"]);
+  assert.deepEqual(r.slides, [6]);
+  // 다른 줄 조합을 고르면 다른 경로
+  const r3 = BC.transitionCycle(9, "minor-penta", 2, "up", 1, [1, 1, 1, 1]).runs[1];
+  assert.equal(r3.notes[r3.slides[0]].s, 3);
+  // 하행은 높은 블록 최고음 → 낮은 블록 최저음
+  const d = BC.transitionCycle(9, "minor-penta", 2, "down", 1, [0, 0, 0, 0]).runs[1];
+  assert.equal(`${d.notes[0].s}-${d.notes[0].f}`, "1-10"); assert.equal(`${d.notes.at(-1).s}-${d.notes.at(-1).f}`, "6-5");
+  // 블록 3개 상행은 두 번 슬라이드, 왕복은 꼭대기에서 방향 전환
+  const t = BC.transitionCycle(9, "minor-penta", 3, "up", 1, [0, 0, 0]).runs[1];
+  assert.equal(t.slides.length, 2);
+  const ud = BC.transitionCycle(0, "major", 3, "updown", 2, [0, 0, 0, 0, 0]);
+  for (const x of ud.runs) {
+    const m = x.notes.map(n => n.midi), top = m.indexOf(Math.max(...m));
     assert.ok(top > 0 && top < m.length - 1);
     for (let i = 1; i <= top; i++) assert.ok(m[i] > m[i - 1]);
     for (let i = top + 1; i < m.length; i++) assert.ok(m[i] < m[i - 1]);
   }
 });
 
-test("Block Transition: 모든 스케일·키·모양에서 경로 생성, 한 줄 4프렛 이내", () => {
-  for (const id of Object.keys(S.SCALES)) for (let pc = 0; pc < 12; pc++) for (const [cnt, shape] of [[2, "up"], [2, "down"], [3, "updown"], [3, "downup"]]) {
-    const c = BC.transitionCycle(pc, id, cnt, shape, 1);
+test("Block Transition: 모든 스케일·키·모양에서 경로 생성, 슬라이드는 같은 줄", () => {
+  for (const id of Object.keys(S.SCALES)) for (let pc = 0; pc < 12; pc++) for (const [cnt, shape] of [[2, "up"], [2, "down"], [3, "up"], [3, "updown"]]) {
+    const c = BC.transitionCycle(pc, id, cnt, shape, 1, [pc % 4, 1, 2, 3, 0, 1, 2, 3]);
     assert.equal(c.runs.length, S.neckOrder(pc, id).length - cnt + 1, `${id} ${pc} ${shape}`);
     for (const r of c.runs) {
-      // 같은 줄에서 연속으로 치는 음 묶음마다 4프렛 이내
-      let group = [r.notes[0]];
-      const check = g => assert.ok(Math.max(...g.map(n => n.f)) - Math.min(...g.map(n => n.f)) <= 4, `${id} ${pc} ${r.label} ${g[0].s}번 현`);
+      assert.ok(r.slides.length >= cnt - 1, `${id} ${pc} ${r.label} 슬라이드`);
+      for (const i of r.slides) assert.equal(r.notes[i].s, r.notes[i - 1].s);
       for (let i = 1; i < r.notes.length; i++) {
-        if (r.notes[i].s === group[0].s) group.push(r.notes[i]); else { check(group); group = [r.notes[i]]; }
+        assert.notEqual(r.notes[i].midi, r.notes[i - 1].midi);
+        assert.ok(Math.abs(r.notes[i].s - r.notes[i - 1].s) <= 1, "줄 건너뛰기 없음");
       }
-      check(group);
     }
   }
 });
 
-test("Interval Finding: 12문제, 근음 제외 도수, 정답은 지정 현의 해당 음", () => {
-  let s = 1;
-  const rand = () => ((s = (s * 1664525 + 1013904223) >>> 0) / 2 ** 32);
-  const deck = IC.makeDeck(["minor-penta", "major"], 0, rand);
-  assert.equal(deck.length, 12);
-  for (const p of deck) {
-    assert.notEqual(p.semi, 0);
-    const open = [64, 59, 55, 50, 45, 40][p.string - 1];
-    assert.ok(IC.answer(p).length >= 1);
-    for (const f of IC.answer(p)) assert.equal((open + f) % 12, (p.rootPc + p.semi) % 12);
-  }
-  for (let i = 1; i < 12; i++) assert.ok(deck[i].string >= 1 && deck[i].string <= 6);
-  // 12문제 정답 확인 = 완료 1회
-  let st = IC.init({ scales: ["blues"], timeLimit: 8, key: -1 });
-  let u = 0;
-  for (let i = 0; i < 12; i++) { st = IC.next(st, 0, rand); const r = IC.reveal(st); st = r.state; if (r.completedUnit) u++; }
-  assert.equal(u, 1);
-});

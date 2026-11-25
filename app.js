@@ -11,13 +11,24 @@ import * as RandomChord from "./modules/chords/random-view.js";
 import * as BpmChord from "./modules/chords/bpm-view.js";
 import * as PlaySession from "./modules/chords/play-view.js";
 import { KEYS as PLAY_KEYS, STYLES as PLAY_STYLES } from "./modules/chords/play-core.js";
-import * as ScaleInterval from "./modules/scales/interval-view.js";
-import * as ScaleLearning from "./modules/scales/learning-view.js";
+import * as ScaleShape from "./modules/scales/shape-view.js";
+import { ShapeRoot as ScaleRoot, RootCycle as ScaleRootCycle } from "./modules/scales/rootquiz-view.js";
+import * as ScaleStart from "./modules/scales/start-view.js";
+import * as ScaleMode from "./modules/scales/mode-view.js";
 import * as ScaleTransition from "./modules/scales/transition-view.js";
-import * as ScaleRoot from "./modules/scales/root-view.js";
 import { renderDictionary } from "./modules/chords/dictionary-view.js";
+import * as LickLearn from "./modules/licks/learn-view.js";
+import * as GenreComping from "./modules/chords/comping-view.js";
+import * as ChordMelody from "./modules/chords/melody-view.js";
+import { renderLickList } from "./modules/licks/list-view.js";
+import { renderLickEditor } from "./modules/licks/editor-view.js";
+import { loadMyLicks, mergeMyLicks } from "./modules/licks/my-licks.js";
+import { getFlags as getLickFlags } from "./modules/licks/lick-flags.js";
+import { renderJam } from "./modules/jam/jam-view.js";
+import { strum, loadInstrument } from "./audio/sampler.js";
+import { unlockAudio } from "./audio/context.js";
 
-const APP_VERSION = "1.6.1";
+const APP_VERSION = "2.1.0";
 
 // 구현된 과제의 연습 화면 (모듈/과제 → 화면 모듈)
 // 화면 모듈: settingsHtml, bindSettings, readSettings, mount, clearFinder
@@ -26,14 +37,18 @@ const CONTENT = {
   "chords/random-chord": RandomChord,
   "chords/bpm-chord": BpmChord,
   "chords/play-session": PlaySession,
-  "scales/interval-finding": ScaleInterval,
-  "scales/block-learning": ScaleLearning,
-  "scales/block-transition": ScaleTransition,
-  "scales/block-root": ScaleRoot
+  "scales/shape-learning": ScaleShape,
+  "scales/shape-root": ScaleRoot,
+  "scales/root-cycle": ScaleRootCycle,
+  "scales/start-note": ScaleStart,
+  "scales/mode-switch": ScaleMode,
+  "scales/neck-transition": ScaleTransition,
+  "licks/lick-learn": LickLearn,
+  "chords/genre-comping": GenreComping,
+  "chords/chord-melody": ChordMelody
 };
-// S5(Chord-Scale Application)는 반주 엔진 단계에서 구현
-const NOT_YET = new Set(["scales/s5"]);
-const contentFor = (mod, task, level) => (NOT_YET.has(`${mod}/${level}`) ? null : CONTENT[`${mod}/${task}`] || null);
+// 과제에 pending이 있으면(예: Scales 코드 전환하며 익히기) 아직 연습 화면 없음
+const contentFor = (mod, task, level) => { const t = findTask(mod, level, task); return t && t.pending ? null : CONTENT[`${mod}/${task}`] || null; };
 function clearContent() { Object.values(CONTENT).forEach(c => c.clearFinder && c.clearFinder()); }
 
 // ───────────── 공용 도우미 ─────────────
@@ -164,6 +179,7 @@ function render() {
     else if (a === "journal") title = renderJournal(b, c);
     else if (a === "log") title = renderLog(b);
     else if (a === "data") title = renderData();
+    else if (a === "jam") title = renderJamPage();
     else { go("", { replace: true }); return; }
   } catch (e) {
     console.error(e);
@@ -175,8 +191,30 @@ function render() {
   window.scrollTo(0, 0);
 }
 
+// ───────────── 백킹 트랙 ─────────────
+function renderJamPage() {
+  view.innerHTML = `
+    <div class="page-head"><div class="eyebrow">Backing Track</div><h1>백킹 트랙</h1></div>
+    <div id="jamArea" style="display:grid;gap:14px"></div>`;
+  onCleanup(renderJam($("#jamArea"), { toast }));
+  return "백킹 트랙";
+}
+
+// 코드 다이어그램을 누르면 그 운지를 스트럼으로 들려줌(모든 화면 공통)
+document.addEventListener("click", async e => {
+  const cell = e.target.closest(".chord-cell[data-midis]");
+  if (!cell) return;
+  try {
+    const ctx = await unlockAudio();
+    await loadInstrument("acoustic");
+    strum("acoustic", cell.dataset.midis.split(",").map(Number), ctx.currentTime + 0.03, 1.6, { gain: 0.55, spread: 0.03 });
+    cell.classList.add("ringing"); setTimeout(() => cell.classList.remove("ringing"), 600);
+  } catch (_) {}
+});
+
 // ───────────── 홈 ─────────────
 const ICON = {
+  jam: '<svg viewBox="0 0 24 24"><path d="M9 18V6l11-2v12"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg>',
   journal: '<svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 9h16M9 3v4M15 3v4"/></svg>',
   data: '<svg viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 17v3h16v-3"/></svg>'
 };
@@ -190,13 +228,14 @@ function renderHome() {
     <div class="today" id="today"><span class="muted">오늘 연습</span> <b>-</b></div>
     <div class="module-grid">
       ${MODULES.map((m, i) => `
-        <button class="module-card ${i === MODULES.length - 1 ? "wide" : ""}" type="button" data-mod="${m.id}" style="--mc:${modColor(m.id)}">
+        <button class="module-card ${MODULES.length % 2 && i === MODULES.length - 1 ? "wide" : ""}" type="button" data-mod="${m.id}" style="--mc:${modColor(m.id)}">
           <span class="bar"></span>
           <span><strong>${esc(m.name)}</strong><small>${esc(m.sub)}</small></span>
           <span class="meta">${m.levels.length} LEVELS</span>
         </button>`).join("")}
     </div>
     <div class="tool-row">
+      <button class="tool-card" type="button" data-go="jam">${ICON.jam}<div><b>백킹 트랙</b><span>진행·키·템포 반주</span></div></button>
       <button class="tool-card" type="button" data-go="journal">${ICON.journal}<div><b>학습일지</b><span>연·월·일 기록</span></div></button>
       <button class="tool-card" type="button" data-go="data">${ICON.data}<div><b>데이터 관리</b><span>백업 · 복원</span></div></button>
     </div>
@@ -275,6 +314,20 @@ function renderTask(modId, lvlId, taskId) {
     return null;
   }
   const otherActive = !!active;
+  if (t.reference && modId === "licks") {
+    view.innerHTML = `
+      <div class="session-layout">
+        <div class="panel session-head span-all">
+          <div class="crumbs">${esc(m.name)} · ${esc(l.name)}</div>
+          <h1>${esc(t.name)}</h1>
+          <div class="tag-row"><span class="tag">${taskId === "my-edit" ? "입력·편집" : "목록·표시"} · 기록 없음</span></div>
+        </div>
+        <div class="span-all" id="lickArea" style="display:grid;gap:14px"></div>
+      </div>`;
+    if (taskId === "my-edit") onCleanup(renderLickEditor($("#lickArea"), { toast, ask }));
+    else renderLickList($("#lickArea"), { level: lvlId, toast, ask });
+    return m.name;
+  }
   if (t.reference && modId === "chords") {
     view.innerHTML = `
       <div class="session-layout">
@@ -312,7 +365,7 @@ function renderTask(modId, lvlId, taskId) {
       ${content ? `<div class="panel span-all"><h3 class="panel-title">세션 설정</h3>${content.settingsHtml(lvlId)}</div>` : `<div class="panel placeholder span-all">
         ${t.reference
           ? `<b>참고 기능</b><br>Chord Dictionary는 연습 세션이 아니라 참고 기능이라 기록하지 않음. 사전 화면은 ${m.stage}단계에서 구현 예정임`
-          : `<b>학습 콘텐츠 준비 중</b><br>이 과제의 실제 연습 화면은 개발 ${m.stage}단계에서 구현됨. 지금은 학습 주제를 골라 세션 시작·일시정지·종료와 기록·학습일지를 사용할 수 있음`}
+          : `<b>학습 콘텐츠 준비 중</b><br>이 과제의 실제 연습 화면은 ${t.pending ? esc(t.pending) : `개발 ${m.stage}단계에서 구현됨`}. 지금은 학습 주제를 골라 세션 시작·일시정지·종료와 기록·학습일지를 사용할 수 있음`}
       </div>`}
       ${t.reference ? "" : `
       <div class="span-all">
@@ -422,7 +475,7 @@ function renderSession() {
         ${unitsPanel}
         ${metroPanel}
         <div class="panel placeholder">
-          <b>학습 콘텐츠는 ${m ? m.stage : "-"}단계에서 구현 예정</b><br>
+          <b>학습 콘텐츠는 ${(() => { const tk = findTask(s0.module, s0.level, s0.task); return tk && tk.pending ? esc(tk.pending) : `${m ? m.stage : "-"}단계에서 구현 예정`; })()}</b><br>
           지금은 아래 시험용 버튼으로 완료 기록을 확인할 수 있음. 실제 과제가 붙으면 이 버튼은 자동 판정으로 바뀜
           <div style="margin-top:10px"><button class="btn small" id="unitBtn" type="button">완료 1회 기록 (시험용)</button></div>
         </div>
@@ -844,7 +897,7 @@ function renderData() {
 
 async function exportBackup(list) {
   const now = Date.now();
-  const data = B.buildBackup(list, { bpm: metro.bpm, beats: metro.beats }, now);
+  const data = B.buildBackup(list, { bpm: metro.bpm, beats: metro.beats, myLicks: loadMyLicks(), lickFlags: getLickFlags() }, now);
   const text = JSON.stringify(data, null, 2);
   const name = B.backupFileName(now);
   const file = new File([text], name, { type: "application/json" });
@@ -886,6 +939,8 @@ async function importBackup(text, existing) {
     if (p.settings) {
       if (Number.isFinite(p.settings.bpm)) { metro.bpm = p.settings.bpm; Store.setSetting("bpm", metro.bpm); }
       if (Number.isFinite(p.settings.beats)) { metro.beats = p.settings.beats; Store.setSetting("beats", metro.beats); }
+      if (Array.isArray(p.settings.myLicks)) mergeMyLicks(p.settings.myLicks);
+      if (p.settings.lickFlags && typeof p.settings.lickFlags === "object") localStorage.setItem("fretlab:lickflags", JSON.stringify({ ...getLickFlags(), ...p.settings.lickFlags }));
     }
     toast(mode === "replace" ? `전체 교체 완료 (${p.records.length}개)` : `합치기 완료 (총 ${plan.total}개)`);
     render();

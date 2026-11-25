@@ -36,6 +36,7 @@ export function degreeOf(semi, scaleId) {
   const s = mod(semi);
   const sc = SCALES[scaleId];
   if (sc && sc.chord) return { 0: "R", 3: "♭3", 4: "3", 6: "♭5", 7: "5", 10: "♭7", 11: "7" }[s];
+  if (scaleId === "lydian" && s === 6) return "♯4";
   return ["R", "♭2", "2", "♭3", "3", "4", "♭5", "5", "♭6", "6", "♭7", "7"][s];
 }
 
@@ -199,73 +200,81 @@ function poolOf(bs, rootPc, scaleId) {
   return pool;
 }
 
-// from/to: {s,f} 시작·끝 음, up: 상행 여부
-function routeSegment(pool, from, to, up) {
-  const fm = MIDI_OPEN[from.s - 1] + from.f, tm = MIDI_OPEN[to.s - 1] + to.f;
-  const pitches = [...new Set(pool.map(p => p.midi))].filter(m => (up ? m >= fm && m <= tm : m <= fm && m >= tm)).sort((a, b) => (up ? a - b : b - a));
-  const cands = pitches.map((m, i) => {
-    if (i === 0) return [{ ...from, midi: fm, inBlock: true }];
-    if (i === pitches.length - 1) return [{ ...to, midi: tm, inBlock: true }];
-    return pool.filter(p => p.midi === m);
-  });
-  // DP: 손 위치(4프렛 구간의 시작 p)를 상태로 둠. 구간 안의 음은 손 이동 없이, 구간을 옮기면(포지션 이동) 비용
-  // 상태 = (후보, 같은 줄 음 수, 그 줄 첫 프렛, 손 위치 p)
-  const neckDir = Math.sign(to.f - from.f);
-  const fits = (f, p) => f === 0 || (f >= p && f <= p + 3);
-  const stretch = (f, p) => f === p - 1 || f === p + 4;
-  const startPs = [];
-  for (let p = Math.max(0, from.f - 3); p <= Math.max(0, from.f); p++) startPs.push(p);
+// ── 블록 전환 경로 (슬라이드 연결) ──
+// seq: 지나갈 블록 순서, ks: 블록을 바꿀 줄(seq.length - 1개), up: 음 높이 방향
+// 규칙: 각 구간의 음은 그 블록 안의 운지만 사용, 블록 전환은 정해진 줄에서 같은 줄 슬라이드(1~4프렛)로만
+//       줄 건너뛰기 없음, 같은 음 반복 없음
+// pool이 주어지면(완화 모드) 블록 밖이지만 그 블록 프렛 범위 ±1 안의 스케일 음도 감점을 두고 허용
+function routeShift(seq, ks, up, pool = null) {
+  const key = n => n.s + "-" + n.f;
+  const sets = seq.map(b => new Set(b.notes.map(key)));
+  const near = (ph, c) => pool && c.f >= seq[ph].lo - 1 && c.f <= seq[ph].hi + 1;
+  const all = new Map();
+  for (const b of seq) for (const n of b.notes) all.set(key(n), { s: n.s, f: n.f, midi: MIDI_OPEN[n.s - 1] + n.f });
+  if (pool) for (const p of pool) if (!all.has(key(p))) all.set(key(p), { s: p.s, f: p.f, midi: p.midi });
+  const first = seq[0], last = seq[seq.length - 1];
+  const startN = up ? first.notes.filter(n => n.s === 6).sort((x, y) => x.f - y.f)[0] : first.notes.filter(n => n.s === 1).sort((x, y) => y.f - x.f)[0];
+  const endN = up ? last.notes.filter(n => n.s === 1).sort((x, y) => y.f - x.f)[0] : last.notes.filter(n => n.s === 6).sort((x, y) => x.f - y.f)[0];
+  if (!startN || !endN) return null;
+  const sm = MIDI_OPEN[startN.s - 1] + startN.f, em = MIDI_OPEN[endN.s - 1] + endN.f;
+  const pitches = [...new Set([...all.values()].map(p => p.midi))]
+    .filter(m => (up ? m >= sm && m <= em : m <= sm && m >= em)).sort((x, y) => (up ? x - y : y - x));
+  const cands = pitches.map(m => [...all.values()].filter(p => p.midi === m));
+  const lastPhase = seq.length - 1;
   let layer = new Map();
-  for (const p of startPs) layer.set(`0|1|${from.f}|${p}`, { cost: Math.abs(p - Math.max(0, from.f - 1)) * 0.1, cand: cands[0][0], count: 1, first: from.f, p, prev: null });
+  for (const c of cands[0]) if (c.s === startN.s && c.f === startN.f) layer.set(`${key(c)}|0|1`, { cost: 0, c, ph: 0, cnt: 1, prev: null, slide: false });
   for (let i = 1; i < pitches.length; i++) {
     const next = new Map();
-    for (const st of layer.values()) {
-      for (const c of cands[i]) {
-        const sameString = c.s === st.cand.s;
-        const okString = up ? c.s === st.cand.s || c.s === st.cand.s - 1 : c.s === st.cand.s || c.s === st.cand.s + 1;
-        if (!okString) continue;
-        if (sameString && (up ? c.f <= st.cand.f : c.f >= st.cand.f)) continue;
-        const count = sameString ? st.count + 1 : 1;
-        if (count > 4) continue;
-        const first = sameString ? st.first : c.f;
-        if (Math.abs(c.f - first) > 4) continue; // 한 줄 안에서는 4프렛 이내
-        // 손 위치 후보: 그대로 / 이 음을 포함하도록 이동
-        const ps = new Set([st.p]);
-        if (c.f > 0) for (let p = Math.max(0, c.f - 3); p <= c.f; p++) ps.add(p);
-        for (const p of ps) {
-          let cost;
-          if (fits(c.f, p)) cost = 0;
-          else if (stretch(c.f, p)) cost = 1.5;
-          else continue;
-          if (p !== st.p) {
-            const d = p - st.p;
-            cost += 2 + Math.abs(d) + (neckDir !== 0 && Math.sign(d) === -neckDir ? 3 * Math.abs(d) : 0);
-          }
-          cost += (c.inBlock ? 0 : 2.5) + (count === 4 ? 1 : 0) + Math.abs(c.f - st.cand.f) * 0.1;
-          const key = `${cands[i].indexOf(c)}|${count}|${first}|${p}`;
-          const total = st.cost + cost;
-          if (!next.has(key) || next.get(key).cost > total) next.set(key, { cost: total, cand: c, count, first, p, prev: st });
-        }
+    for (const st of layer.values()) for (const c of cands[i]) {
+      const same = c.s === st.c.s;
+      if (!(same || c.s === st.c.s + (up ? -1 : 1))) continue;
+      if (same && (up ? c.f <= st.c.f : c.f >= st.c.f)) continue;
+      const opts = [];
+      if (sets[st.ph].has(key(c))) opts.push([st.ph, false, 0]);
+      else if (near(st.ph, c)) opts.push([st.ph, false, 3]);
+      // 블록 전환: 정한 줄에서, 같은 줄 슬라이드, 다음 블록에만 있는 음으로
+      if (st.ph < lastPhase && same && c.s === ks[st.ph] && !sets[st.ph].has(key(c)) && (sets[st.ph + 1].has(key(c)) || near(st.ph + 1, c))) {
+        const d = Math.abs(c.f - st.c.f);
+        if (d >= 1 && d <= 4) opts.push([st.ph + 1, true, sets[st.ph + 1].has(key(c)) ? 0 : 3]);
+      }
+      for (const [ph, slide, pen] of opts) {
+        const cnt = same ? st.cnt + 1 : 1;
+        if (cnt > (slide || st.cnt >= 4 && ph !== st.ph ? 5 : 4)) continue;
+        if (!slide && same && Math.abs(c.f - st.c.f) > 4) continue;
+        const cost = st.cost + pen + Math.abs(c.f - st.c.f) * 0.3 + (cnt === 4 ? 1 : 0);
+        const k = `${key(c)}|${ph}|${cnt}`;
+        if (!next.has(k) || next.get(k).cost > cost) next.set(k, { cost, c, ph, cnt, prev: st, slide });
       }
     }
     if (!next.size) return null;
     layer = next;
   }
   let best = null;
-  for (const st of layer.values()) if (!best || st.cost < best.cost) best = st;
-  const path = [];
-  for (let x = best; x; x = x.prev) path.push({ s: x.cand.s, f: x.cand.f, midi: x.cand.midi });
-  return path.reverse();
+  for (const st of layer.values()) if (st.ph === lastPhase && st.c.s === endN.s && st.c.f === endN.f && (!best || st.cost < best.cost)) best = st;
+  if (!best) return null;
+  const out = [];
+  for (let x = best; x; x = x.prev) out.push({ s: x.c.s, f: x.c.f, midi: x.c.midi, slide: x.slide, block: seq[x.ph].index });
+  return out.reverse();
 }
 
-// 끝점 후보: 6번 현은 낮은 음부터, 1번 현은 높은 음부터 (가능한 가장 넓은 구간을 먼저 시도)
-const lows6 = b => b.notes.filter(n => n.s === 6).sort((a, c) => a.f - c.f);
-const highs1 = b => b.notes.filter(n => n.s === 1).sort((a, c) => c.f - a.f);
-
-function tryRoute(pool, froms, tos, up) {
-  for (const f of froms) for (const t of tos) {
-    const r = routeSegment(pool, f, t, up);
-    if (r) return r;
+// 바꿀 줄 후보: 블록 2개 = 4·3·5·2번 줄, 블록 3개 = (5·4번 줄, 3·2번 줄) 조합
+const SWITCH_SETS = {
+  2: [[4], [3], [5], [2]],
+  3: [[5, 3], [4, 2], [5, 2], [4, 3], [5, 4], [3, 2]]
+};
+function routeAny(seq, up, prefer, pool) {
+  const base = SWITCH_SETS[seq.length] || [[]];
+  const opts = up ? base : base.map(o => [...o].reverse());
+  // 마지막 수단: 모든 줄 조합(같은 줄에서 두 번 바꾸는 경우 포함)
+  const extra = [];
+  if (seq.length === 2) for (const k of [6, 1]) extra.push([k]);
+  if (seq.length === 3) for (let a = 6; a >= 1; a--) for (let b = a; b >= 1; b--) extra.push(up ? [a, b] : [b, a]);
+  const seen = new Set();
+  const order = [...(prefer ? [prefer] : []), ...opts, ...extra].filter(o => !seen.has(o.join()) && seen.add(o.join()));
+  // 1차: 블록 운지만 / 2차: 블록 근처 음까지 허용
+  for (const p of [null, pool]) for (const ks of order) {
+    const r = routeShift(seq, ks, up, p);
+    if (r) return { notes: r, ks };
   }
   return null;
 }
@@ -275,29 +284,34 @@ export function neckOrder(rootPc, scaleId) {
   return [...blocks(rootPc, scaleId)].sort((a, b) => a.lo - b.lo || a.index - b.index);
 }
 
-export function connectPath(rootPc, scaleId, startIndex, count, shape) {
+// shape: "up"(낮은 블록 → 높은 블록, 상행) | "down"(높은 블록 → 낮은 블록, 하행) | "updown"(상행 후 하행, 꼭대기 음 1번)
+// pick: 바꿀 줄 조합 번호(무작위 선택용, 없으면 가장 가운데 줄)
+export function connectPath(rootPc, scaleId, startIndex, count, shape, pick = 0) {
   const bs = neckOrder(rootPc, scaleId);
   const sel = bs.slice(startIndex, startIndex + count);
   if (sel.length < count) return null;
+  const opts = SWITCH_SETS[count];
+  const prefer = opts[((pick % opts.length) + opts.length) % opts.length];
+  const rev = [...sel].reverse();
   const pool = poolOf(sel, rootPc, scaleId);
-  const label = n => ({ ...n, ...noteAt(n.s, n.f, rootPc, scaleId) });
-  const segs = [];
-  if (count === 2) {
-    const seg = tryRoute(pool, lows6(sel[0]), highs1(sel[1]), true);
-    if (!seg) return null;
-    segs.push(shape === "down" ? seg.reverse() : seg);
-  } else if (shape === "updown") {
-    const a = tryRoute(pool, lows6(sel[0]), highs1(sel[1]), true);
-    const b = a && tryRoute(pool, [a[a.length - 1]], lows6(sel[2]), false);
-    if (!a || !b) return null;
-    segs.push(a, b.slice(1));
+  let notes;
+  if (shape === "down") {
+    const r = routeAny(rev, false, [...prefer].reverse(), pool);
+    if (!r) return null;
+    notes = r.notes;
   } else {
-    const a = tryRoute(pool, highs1(sel[0]), lows6(sel[1]), false);
-    const b = a && tryRoute(pool, [a[a.length - 1]], highs1(sel[2]), true);
-    if (!a || !b) return null;
-    segs.push(a, b.slice(1));
+    const a = routeAny(sel, true, prefer, pool);
+    if (!a) return null;
+    notes = a.notes;
+    if (shape === "updown") {
+      // 내려올 때는 올라갈 때와 다른 줄에서 바꿔 다른 경로로
+      const other = opts.find(o => o.join() !== a.ks.join());
+      const b = routeAny(rev, false, other ? [...other].reverse() : null, pool);
+      if (!b) return null;
+      notes = notes.concat(b.notes.slice(1));
+    }
   }
-  const notes = segs.flat().map(label);
+  notes = notes.map(n => ({ ...n, ...noteAt(n.s, n.f, rootPc, scaleId) }));
   const fr = notes.map(n => n.f);
-  return { blocks: sel, notes, lo: Math.min(...fr), hi: Math.max(...fr), label: sel.map(b => b.index).join("→") };
+  return { blocks: sel, notes, lo: Math.min(...fr), hi: Math.max(...fr), label: sel.map(b => b.index).join("→"), slides: notes.map((n, i) => (n.slide ? i : -1)).filter(i => i >= 0) };
 }

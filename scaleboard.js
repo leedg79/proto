@@ -1,5 +1,5 @@
 // 스케일 지판 (가로형, 1번 현이 위). 프렛 구간(from~to)만 확대해서 그릴 수 있음
-// notes: [{ s, f, label, kind }] kind: "root" | "note" | "active" | "ghost" | "ghostRoot" | "target"
+// notes: [{ s, f, label, kind }] kind: "root" | "note" | "active" | "ghost" | "ghostRoot" | "target" | "changed"
 
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
@@ -8,6 +8,7 @@ const STYLE = {
   note:      { fill: "#dfe5ec", stroke: "#10180a", text: "#10180a", r: 1 },
   active:    { fill: "#ffcf5c", stroke: "#fff", text: "#1d1600", r: 1.18 },
   target:    { fill: "#a6f36b", stroke: "#10180a", text: "#10180a", r: 1 },
+  changed:   { fill: "#ff9f43", stroke: "#10180a", text: "#1d1000", r: 1 },
   ghost:     { fill: "none", stroke: "#5f6c80", text: "#7d8a9c", r: 0.82 },
   ghostRoot: { fill: "none", stroke: "#a6f36b", text: "#a6f36b", r: 0.82 }
 };
@@ -47,9 +48,14 @@ export function scaleBoardSvg(notes, { from = 0, to = 15, strings = [], labels =
   if (path && path.length > 1) {
     const pts = path.filter(p => p.f >= from && p.f <= to).map(p => `${xOfFret(p.f).toFixed(1)},${yOf(p.s).toFixed(1)}`).join(" ");
     o += `<polyline points="${pts}" fill="none" stroke="#78a9ff" stroke-width="3.2" stroke-linejoin="round" stroke-linecap="round" stroke-opacity=".85" data-path="1"/>`;
+    // 슬라이드(블록 전환) 구간은 주황 굵은 선
+    for (let i = 1; i < path.length; i++) if (path[i].slide) {
+      const a = path[i - 1], b = path[i];
+      o += `<line x1="${xOfFret(a.f).toFixed(1)}" y1="${(yOf(a.s) - 9).toFixed(1)}" x2="${xOfFret(b.f).toFixed(1)}" y2="${(yOf(b.s) - 9).toFixed(1)}" stroke="#ff9f43" stroke-width="4" stroke-linecap="round" data-slide="1"/>`;
+    }
   }
   // 흐린 음 먼저, 강조 음 나중에
-  const rank = { ghost: 0, ghostRoot: 1, note: 2, root: 3, target: 4, active: 5 };
+  const rank = { ghost: 0, ghostRoot: 1, note: 2, changed: 3, root: 3, target: 4, active: 5 };
   for (const n of [...notes].sort((a, b) => rank[a.kind] - rank[b.kind])) {
     if (n.f < from || n.f > to) continue;
     const st = STYLE[n.kind] || STYLE.note;

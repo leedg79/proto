@@ -1,3 +1,4 @@
+import { TUNING } from "../theory/notes.js";
 // 코드 다이어그램 (세로형: 왼쪽 6번 현 → 오른쪽 1번 현, 위가 헤드 쪽)
 // voicing.notes: [{ s, f, label }], voicing.frets: [1번현..6번현] (null = 치지 않음)
 
@@ -47,5 +48,5 @@ export function chordBoxSvg(v, { rows = 5 } = {}) {
 
 export function chordGrid(voicings) {
   return `<div class="chord-grid">${voicings.map(v => `
-    <figure class="chord-cell">${chordBoxSvg(v)}<figcaption>${esc(v.detail)}</figcaption></figure>`).join("")}</div>`;
+    <figure class="chord-cell" data-midis="${v.notes.map(n => TUNING[n.s - 1] + n.f).sort((a, b) => a - b).join(",")}">${chordBoxSvg(v)}<figcaption>${esc(v.detail)}</figcaption></figure>`).join("")}</div>`;
 }
