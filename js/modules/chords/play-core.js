@@ -168,8 +168,24 @@ export function voicingDistance(a, b) {
   return d + Math.abs(pos(a) - pos(b)) * 1.5;
 }
 
-function choose(list, mode, prev) {
-  if (mode === "common" || !prev) return V.rankVoicings(list, { limit: 1 })[0];
+const handPos = v => { const f = v.notes.filter(x => x.f > 0).map(x => x.f); return f.length ? f.reduce((s, x) => s + x, 0) / f.length : 0; };
+
+function choose(list, mode, prev, anchor) {
+  if (!prev) return V.rankVoicings(list, { limit: 1 })[0];
+  if (mode === "common") {
+    // 자주 쓰는 운지 후보(최고 점수 +1 이내) 안에서 손 위치 이동이 가장 적은 것
+    // → 근음 6번 현(E폼)·5번 현(A폼)을 바꿔 가며 섹션 시작 자리(anchor) 근처에 머묾
+    const scored = list.map(v => ({ v, u: V.usageScore(v) }));
+    const best = Math.min(...scored.map(x => x.u));
+    let pick = null, bestCost = Infinity;
+    for (const { v, u } of scored) {
+      if (u > best + 1) continue;
+      const p = handPos(v);
+      const cost = Math.abs(p - handPos(prev)) * 1.5 + Math.abs(p - anchor) * 1.2 + voicingDistance(prev, v) * 0.15 + u * 0.5;
+      if (cost < bestCost) { pick = v; bestCost = cost; }
+    }
+    return pick;
+  }
   let best = null, bestCost = Infinity;
   for (const v of list) {
     const cost = voicingDistance(prev, v) + V.usageScore(v) * 2;
@@ -197,11 +213,13 @@ export function buildPlan({ keyPc, style, topics }, rand = Math.random) {
     };
     const after = si + 1 < raw.length ? raw[si + 1][0][0] : null;
     const realized = applyTopic(raw[si], topic, keyPc, after);
+    let anchor = null;
     realized.forEach((bar, bi) => {
       bars.push({
         section: label, sectionIndex: si, barInSection: bi + 1, topic,
         chords: bar.map(ch => {
-          const v = choose(candidates(topic, ch, ctx), MODE[topic], prev);
+          const v = choose(candidates(topic, ch, ctx), MODE[topic], prev, anchor ?? (prev ? handPos(prev) : 0));
+          if (anchor == null) anchor = handPos(v);
           prev = v;
           const rootLabel = noteName(ch.rootPc, keyPc, ch.chromatic && ch.sub);
           const name = chordName(rootLabel, ch.type) + (ch.bassPc != null ? "/" + noteName(ch.bassPc, keyPc) : "");

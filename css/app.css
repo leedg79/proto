@@ -453,3 +453,20 @@ h1, h2, h3 { margin: 0; line-height: 1.25; }
 .sheet-bar.two { flex-direction: column; gap: 2px; }
 .sheet-bar.two .sheet-chord { flex-direction: row; align-items: baseline; gap: 4px; }
 .sheet-bar.two .sheet-chord b { font-size: 11.5px; }
+
+/* ── 사전: 시스템별 묶음 ── */
+.dict-sys { margin-top: 6px; }
+.dict-sub { font-size: 13px; color: var(--text); font-weight: 600; margin: 10px 0 6px; }
+
+/* ── Scales ── */
+.root-grid.key7 { grid-template-columns: repeat(7, 1fr); }
+.root-grid.key7 button { font-size: 12.5px; padding: 2px; }
+.sb-chips, .sb-timeline { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin: 4px 0 8px; }
+.sb-chip, .sb-step { min-width: 38px; height: 34px; display: inline-flex; align-items: center; justify-content: center; border-radius: 10px; border: 1px solid var(--line); background: var(--panel2); font-family: var(--mono); font-size: 14px; color: var(--muted); }
+.sb-step { min-width: 30px; height: 30px; font-size: 13px; }
+.sb-chip.now, .sb-step.now { border-color: var(--accent); color: var(--text); background: #a6f36b26; font-weight: 700; }
+.sb-chip.past, .sb-step.past { opacity: .5; }
+.sb-step.soon { border-color: var(--warn); color: var(--warn); animation: blink .4s ease-in-out infinite alternate; }
+@keyframes blink { from { opacity: 1; } to { opacity: .35; } }
+.sb-state { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin: 4px 2px 6px; }
+.sb-board { background: #0f151f; border: 1px solid var(--line); border-radius: 14px; padding: 6px; }

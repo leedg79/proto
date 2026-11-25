@@ -261,14 +261,14 @@ test("Play Session: 대리 코드는 V7→I를 ♭II7로, 슬래시는 베이스
   assert.equal(jz.bars[7].chords[0].name, "D♭7");
 });
 
-test("Play Session: 보이스 리딩은 코드 사이 이동이 '자주 쓰는 운지' 방식보다 작음", () => {
+test("Play Session: 보이스 리딩은 코드 사이 음 이동이 작음(평균 6반음 미만)", () => {
   const avg = plan => { const cs = plan.bars.flatMap(b => b.chords); let s = 0; for (let i = 1; i < cs.length; i++) s += PL.voicingDistance(cs[i - 1].voicing, cs[i].voicing); return s / (cs.length - 1); };
   let vl = 0, common = 0;
   for (const k of PL.KEYS) {
     vl += avg(PL.buildPlan({ keyPc: k.pc, style: "jazz", topics: ["voice-leading"] }, seeded(3)));
     common += avg(PL.buildPlan({ keyPc: k.pc, style: "jazz", topics: ["seventh"] }, seeded(3)));
   }
-  assert.ok(vl < common * 0.6, `${vl / 12} vs ${common / 12}`);
+  assert.ok(vl <= common * 1.05 && vl / 12 < 6, `${vl / 12} vs ${common / 12}`);
 });
 
 test("Play Session: 박 위치 계산(준비 4박, 2코드 마디는 2박씩)", () => {
@@ -289,4 +289,38 @@ test("연속 코드 찾기: 16개 무작위, 같은 근음 연속 없음", () =>
     assert.equal(deck.length, 16);
     for (let i = 1; i < 16; i++) assert.notEqual(deck[i].root, deck[i - 1].root, `seed ${seed} at ${i}`);
   }
+});
+
+test("Play Session: 바레·7th 등도 앞 코드 가까이(근음 현을 바꿔 가며), 평균 손 위치 이동 3프렛 이내", () => {
+  const pos = v => { const f = v.notes.filter(n => n.f > 0).map(n => n.f); return f.length ? f.reduce((a, b) => a + b, 0) / f.length : 0; };
+  for (const t of ["barre", "seventh"]) for (const k of PL.KEYS) for (const style of ["pop", "jazz"]) {
+    const cs = PL.buildPlan({ keyPc: k.pc, style, topics: [t] }, seeded(7)).bars.flatMap(b => b.chords);
+    let move = 0;
+    for (let i = 1; i < cs.length; i++) move += Math.abs(pos(cs[i].voicing) - pos(cs[i - 1].voicing));
+    assert.ok(move / (cs.length - 1) <= 3, `${t} ${k.name} ${style} ${(move / (cs.length - 1)).toFixed(2)}`);
+    // 근음 6번 현·5번 현 운지를 함께 씀
+    if (t === "barre") assert.ok(new Set(cs.map(c => c.voicing.detail.slice(0, 2))).size >= 2);
+  }
+});
+
+import { _SYSTEMS, _LEVEL_SYSTEMS } from "../js/modules/chords/dictionary-view.js";
+
+test("사전: 레벨별 구성 시스템 × 가능한 코드 종류 × 근음 12개 → 묶음마다 운지", () => {
+  assert.deepEqual(_LEVEL_SYSTEMS.c1, ["open", "triad", "power"]);
+  assert.equal(_LEVEL_SYSTEMS.c5.length, 17);
+  for (const [sid, sys] of Object.entries(_SYSTEMS)) {
+    const types = sys.types || ["maj"];
+    for (const t of types) {
+      let total = 0;
+      for (let pc = 0; pc < 12; pc++) {
+        const groups = sys.groups(pc, t, "C");
+        for (const g of groups) { assert.ok(g.list.length <= 8, `${sid} ${t}`); total += g.list.length; }
+      }
+      if (sid === "open") assert.ok(total >= 1, sid + t); else assert.ok(total >= 12, `${sid} ${t} ${total}`);
+    }
+  }
+  // 하위 구분: Drop 2는 현 묶음 3개, 7th 전위는 4개, CAGED는 5폼
+  assert.equal(_SYSTEMS.drop2.groups(7, "7").length, 3);
+  assert.equal(_SYSTEMS["seventh-inversion"].groups(7, "7").length, 4);
+  assert.equal(_SYSTEMS.caged.groups(0, "maj").length, 5);
 });

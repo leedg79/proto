@@ -11,9 +11,13 @@ import * as RandomChord from "./modules/chords/random-view.js";
 import * as BpmChord from "./modules/chords/bpm-view.js";
 import * as PlaySession from "./modules/chords/play-view.js";
 import { KEYS as PLAY_KEYS, STYLES as PLAY_STYLES } from "./modules/chords/play-core.js";
+import * as ScaleInterval from "./modules/scales/interval-view.js";
+import * as ScaleLearning from "./modules/scales/learning-view.js";
+import * as ScaleTransition from "./modules/scales/transition-view.js";
+import * as ScaleRoot from "./modules/scales/root-view.js";
 import { renderDictionary } from "./modules/chords/dictionary-view.js";
 
-const APP_VERSION = "1.5.0";
+const APP_VERSION = "1.6.0";
 
 // 구현된 과제의 연습 화면 (모듈/과제 → 화면 모듈)
 // 화면 모듈: settingsHtml, bindSettings, readSettings, mount, clearFinder
@@ -21,9 +25,15 @@ const CONTENT = {
   "notes/note-finder": NoteFinder,
   "chords/random-chord": RandomChord,
   "chords/bpm-chord": BpmChord,
-  "chords/play-session": PlaySession
+  "chords/play-session": PlaySession,
+  "scales/interval-finding": ScaleInterval,
+  "scales/block-learning": ScaleLearning,
+  "scales/block-transition": ScaleTransition,
+  "scales/block-root": ScaleRoot
 };
-const contentFor = (mod, task) => CONTENT[`${mod}/${task}`] || null;
+// S5(Chord-Scale Application)는 반주 엔진 단계에서 구현
+const NOT_YET = new Set(["scales/s5"]);
+const contentFor = (mod, task, level) => (NOT_YET.has(`${mod}/${level}`) ? null : CONTENT[`${mod}/${task}`] || null);
 function clearContent() { Object.values(CONTENT).forEach(c => c.clearFinder && c.clearFinder()); }
 
 // ───────────── 공용 도우미 ─────────────
@@ -245,7 +255,7 @@ function renderTasks(modId, lvlId) {
     </div>
     <div class="list">
       ${l.tasks.map(t => `
-        <button class="list-item ${t.reference ? "disabled" : ""}" type="button" data-task="${t.id}">
+        <button class="list-item" type="button" data-task="${t.id}">
           <div class="txt"><b>${esc(t.name)}</b><span>${esc(t.unit.label)}</span></div>
           <span class="tag">${esc(SESSION_TYPES[t.type] || t.type)}</span>
           <div class="chev">›</div>
@@ -278,7 +288,7 @@ function renderTask(modId, lvlId, taskId) {
     renderDictionary($("#dictArea"), { level: lvlId });
     return m.name;
   }
-  const content = contentFor(modId, taskId);
+  const content = contentFor(modId, taskId, lvlId);
   const topics = topicsFor(modId, lvlId, taskId);
   const topicKey = `topics:${modId}/${lvlId}/${taskId}`;
   const savedTopics = Store.getSetting(topicKey, null);
@@ -356,7 +366,7 @@ function renderSession() {
   const m = findModule(s0.module);
   const t = findTask(s0.module, s0.level, s0.task);
   const unitLabel = t ? t.unit.label : "";
-  const content = contentFor(s0.module, s0.task);
+  const content = contentFor(s0.module, s0.task, s0.level);
   const unitsPanel = `
         <div class="panel">
           <div class="units">

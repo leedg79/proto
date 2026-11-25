@@ -13,7 +13,7 @@ export const UNIT = {
   blocks5: { kind: "blocks", size: 5, label: "5개 블록 1사이클 = 1회" },
   positions7: { kind: "positions", size: 7, label: "7개 포지션 1사이클 = 1회" },
   mission: { kind: "mission", size: 1, label: "과제 미션 완료 = 1회" },
-  none: { kind: "none", size: 0, label: "참고 기능(세션 기록 없음)" }
+  none: { kind: "none", size: 0, label: "근음·코드 종류별 자주 쓰는 운지 검색 · 기록 없음" }
 };
 
 // 세션 유형
@@ -25,7 +25,7 @@ export const SESSION_TYPES = {
   pattern: "패턴 연습",
   ear: "청음",
   transcribe: "채보",
-  reference: "참고"
+  reference: "사전"
 };
 
 const CHORD_TASKS = [
