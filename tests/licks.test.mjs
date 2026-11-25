@@ -55,9 +55,28 @@ test("내 릭: 직접 입력한 릭이 목록에 붙고, 4마디까지 허용", 
   assert.equal(L.LICKS.length, 135);
 });
 
-test("Licks 메뉴: 6개 레벨, 익히기·목록, 나머지 과제는 준비 중", () => {
+test("Licks 메뉴: 레벨별 과제", () => {
   assert.equal(topicsFor("licks", "l1", "lick-learn").length, 4);
   assert.ok(findTask("licks", "l4", "lick-list").reference);
-  assert.ok(findTask("licks", "l2", "lick-backing").pending);
+  assert.ok(!findTask("licks", "l2", "lick-backing").pending);
   for (const l of LICK_LEVELS) for (const id of l.id === "l7" ? ["my-edit", "lick-learn", "lick-list"] : ["lick-learn", "lick-list", "lick-move"]) assert.ok(findTask("licks", l.id, id).unit.label, `${l.id} ${id} 완료 단위`);
+});
+
+test("릭 활용: 옮기기·변형·주고받기 코드", async () => {
+  const A = await import("../js/modules/licks/apply-core.js");
+  for (const l of L.LICKS.filter(x => !x.custom)) {
+    const r = L.realize(l);
+    const m = A.moveTo(r, (r.key + 5) % 12, { lo: 7, hi: 11 });
+    const d = m.events.find(e => !e.rest).notes[0].f - r.events.find(e => !e.rest).notes[0].f;
+    assert.ok(((d % 12) + 12) % 12 === 5, `${l.id} 4도 위로`);
+    assert.ok(m.events.every(e => e.notes.every(n => n.f >= 0 && n.f <= 20)));
+    for (const t of A.variationTypes(r)) {
+      const v = A.makeVariation(r, t);
+      assert.ok(v.events.some(e => !e.rest), `${l.id} ${t}`);
+      assert.ok(v.events.every(e => e.notes.every(n => n.f >= 0 && n.f <= 20)), `${l.id} ${t} 범위`);
+    }
+    const c = A.callResponse(r);
+    assert.equal(c.custom.length, c.bars * 2);
+    assert.ok(c.custom.every(b => b.segs.reduce((a, x) => a + x.beats, 0) === 4), `${l.id} 마디 4박`);
+  }
 });

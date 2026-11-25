@@ -25,12 +25,18 @@ const DEG_Q = { 1: "M", 2: "m", 3: "m", 4: "M", 5: "dom", 6: "m", 7: "hdim" };
 const ROMAN = { 1: "I", 2: "ii", 3: "iii", 4: "IV", 5: "V", 6: "vi", 7: "vii" };
 const II7 = { rel: 2, q: "dom", roman: "II7" };
 const BVII7 = { rel: 10, q: "dom", roman: "♭VII7" };
+// 단조 진행(키 = 단조 으뜸음): 자연 단음계 + 화성 단음계 V7
+const mi = (rel, q, roman) => ({ rel, q, roman, minor: true });
+const I_M = mi(0, "m", "i"), III_M = mi(3, "M", "♭III"), IV_M = mi(5, "m", "iv"), V_D = mi(7, "dom", "V"), VI_M = mi(8, "M", "♭VI"), VII_M = mi(10, "dom", "♭VII"), II_H = mi(2, "hdim", "ii");
 
 export const STYLES = {
   pop: { name: "Pop", A: [[1], [5], [6], [4], [1], [5], [4], [5]], B: [[6], [4], [1], [5], [6], [4], [2], [5]], A2: [[1], [5], [6], [4], [1], [5], [4, 5], [1]] },
   ballad: { name: "Ballad", A: [[1], [6], [4], [5], [1], [6], [2], [5]], B: [[4], [5], [3], [6], [2], [5], [4], [5]], A2: [[1], [6], [4], [5], [1], [6], [2, 5], [1]] },
   jazz: { name: "Jazz (ii-V-I)", A: [[1], [6], [2], [5], [1], [6], [2], [5]], B: [[4], [4], [3], [6], [2], [2], [5], [5]], A2: [[1], [6], [2], [5], [3, 6], [2, 5], [1], [1]] },
-  bossa: { name: "Bossa Nova", A: [[1], [1], [II7], [II7], [2], [5], [1], [1]], B: [[4], [4], [BVII7], [BVII7], [3], [6], [2], [5]], A2: [[1], [1], [II7], [II7], [2], [5], [1], [1]] }
+  bossa: { name: "Bossa Nova", A: [[1], [1], [II7], [II7], [2], [5], [1], [1]], B: [[4], [4], [BVII7], [BVII7], [3], [6], [2], [5]], A2: [[1], [1], [II7], [II7], [2], [5], [1], [1]] },
+  "minor-pop": { name: "Minor Pop (단조)", minor: true, A: [[I_M], [VI_M], [III_M], [VII_M], [I_M], [VI_M], [III_M], [VII_M]], B: [[IV_M], [I_M], [VI_M], [V_D], [IV_M], [I_M], [VI_M], [V_D]], A2: [[I_M], [VI_M], [III_M], [VII_M], [I_M], [VI_M], [IV_M, V_D], [I_M]] },
+  "minor-jazz": { name: "Minor ii-V-i (단조)", minor: true, A: [[I_M], [I_M], [II_H], [V_D], [I_M], [IV_M], [II_H], [V_D]], B: [[IV_M], [IV_M], [VII_M], [III_M], [VI_M], [II_H], [V_D], [V_D]], A2: [[I_M], [I_M], [II_H], [V_D], [I_M], [IV_M], [II_H, V_D], [I_M]] },
+  andalusian: { name: "Andalusian (i-♭VII-♭VI-V)", minor: true, A: [[I_M], [VII_M], [VI_M], [V_D], [I_M], [VII_M], [VI_M], [V_D]], B: [[IV_M], [I_M], [IV_M], [V_D], [VI_M], [III_M], [II_H], [V_D]], A2: [[I_M], [VII_M], [VI_M], [V_D], [I_M], [VII_M], [VI_M, V_D], [I_M]] }
 };
 
 // 주제 → 화성 단계와 보이싱 방식
@@ -61,6 +67,7 @@ function typeFor(q, tier, deg) {
 const TYPE_SUFFIX_ROMAN = { maj: "", m: "", dim: "°", aug: "+", sus4: "sus4", "5": "5", maj7: "maj7", m7: "7", "7": "7", m7b5: "ø7", dim7: "°7", maj9: "maj9", m9: "9", "9": "9" };
 
 function romanOf(entry, type) {
+  if (typeof entry === "object" && entry.minor) return entry.roman + (TYPE_SUFFIX_ROMAN[type] ?? "");
   if (typeof entry === "object") return entry.roman;
   const r = ROMAN[entry];
   const upper = ["maj", "maj7", "7", "9", "maj9", "5", "sus4", "aug"].includes(type);
@@ -75,7 +82,7 @@ function realizeSection(template, keyPc, tier) {
     if (typeof entry === "object") { rootPc = mod(keyPc + entry.rel); q = entry.q; }
     else { deg = entry; rootPc = mod(keyPc + MAJOR_STEPS[deg - 1]); q = DEG_Q[deg]; }
     const type = typeFor(q, tier, deg);
-    return { rootPc, type, deg, roman: romanOf(entry, type), beats: 4 / bar.length, chromatic: typeof entry === "object" };
+    return { rootPc, type, deg, roman: romanOf(entry, type), beats: 4 / bar.length, chromatic: typeof entry === "object" && !entry.minor };
   }));
 }
 
@@ -228,7 +235,8 @@ export function buildPlan({ keyPc, style, topics }, rand = Math.random) {
       });
     });
   });
-  return { keyPc, keyName: KEYS.find(k => k.pc === keyPc)?.name || noteName(keyPc, keyPc), style, styleName: st.name, topics: [...topics], bars };
+  const kn = KEYS.find(k => k.pc === keyPc)?.name || noteName(keyPc, keyPc);
+  return { keyPc, keyName: st.minor ? kn + "m" : kn, minor: !!st.minor, style, styleName: st.name, topics: [...topics], bars };
 }
 
 // 박 → 마디·코드 위치 (4/4, 1마디 준비 박)

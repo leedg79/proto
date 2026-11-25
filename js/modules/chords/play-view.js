@@ -17,7 +17,7 @@ export function settingsHtml() {
   const style = getSetting("play.style", "pop");
   const bpm = clampBpm(getSetting("play.bpm", BPM_DEFAULT));
   return `
-    <div class="field"><label>키(장조)</label>
+    <div class="field"><label>키(단조 진행은 이 음이 단조 으뜸음)</label>
       <div class="root-grid" id="plKey">${PL.KEYS.map(k => `<button type="button" data-key="${k.pc}" class="${k.pc === key ? "sel" : ""}">${esc(k.name)}</button>`).join("")}</div>
     </div>
     <div class="field" style="margin-top:14px"><label>진행 유형</label>
@@ -108,7 +108,7 @@ export function mount(container, api) {
     const bar = st.plan.bars[bi];
     $("#plSec").textContent = `${bar.section} · ${bar.barInSection}/8마디`;
     $("#plProg").textContent = `${bi + 1}/32마디 · 완료 ${st.passes}회`;
-    $("#plInfo").textContent = `${st.plan.keyName} 장조 · ${st.plan.styleName} · ${tn(bar.topic)}`;
+    $("#plInfo").textContent = `${st.plan.keyName} ${st.plan.minor ? "단조" : "장조"} · ${st.plan.styleName} · ${tn(bar.topic)}`;
     $("#plName").textContent = cur.name;
     $("#plName").classList.toggle("long", cur.name.length > 7);
     $("#plRoman").textContent = cur.roman + (cur.sub ? ` · ${cur.sub}` : "");
@@ -197,7 +197,7 @@ export function mount(container, api) {
   $("#plSave").onclick = async () => {
     const d = new Date();
     const p2 = n => String(n).padStart(2, "0");
-    const meta = `${st.plan.keyName} 장조 · ${st.plan.styleName} · ${st.bpm} BPM · ${st.plan.topics.map(tn).join(", ")} · ${d.getFullYear()}.${p2(d.getMonth() + 1)}.${p2(d.getDate())}`;
+    const meta = `${st.plan.keyName} ${st.plan.minor ? "단조" : "장조"} · ${st.plan.styleName} · ${st.bpm} BPM · ${st.plan.topics.map(tn).join(", ")} · ${d.getFullYear()}.${p2(d.getMonth() + 1)}.${p2(d.getDate())}`;
     try {
       await savePng(sheetSvg(st.plan, { title: `Play Session · ${st.plan.keyName} ${st.plan.styleName}`, meta, topicName: tn }), `fretlab-chordsheet-${d.getFullYear()}${p2(d.getMonth() + 1)}${p2(d.getDate())}-${p2(d.getHours())}${p2(d.getMinutes())}.png`);
       api.toast("코드표를 저장함");

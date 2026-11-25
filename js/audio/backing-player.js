@@ -45,7 +45,10 @@ export async function startBacking(opts) {
     }
     const b = beatIdx - countIn;
     const beatInSong = b % song.beats, loop = Math.floor(b / song.beats);
-    if (beatInSong % 4 === 0) later(ctx, time, () => opts.onBar && opts.onBar(beatInSong / 4, loop));
+    if (beatInSong % 4 === 0) {
+      if (opts.onBarTime) opts.onBarTime(beatInSong / 4, loop, time, 60 / sched.bpm);
+      later(ctx, time, () => opts.onBar && opts.onBar(beatInSong / 4, loop));
+    }
     later(ctx, time, () => opts.onBeat && opts.onBeat(beatInSong % 4, false, 0));
     for (const e of state.events) {
       if (e.beat < beatInSong || e.beat >= beatInSong + 1) continue;
@@ -66,6 +69,7 @@ function later(ctx, time, fn) {
 
 export function setCompOn(on) { const ctx = getAudioContext(); if (ctx) setPartLevel("comp", on ? (state && state.opts.compLevel) ?? 0.6 : 0); }
 export function setBackingBpm(bpm) { if (sched) sched.setBpm(bpm); }
+export const backingBpm = () => (sched ? sched.bpm : null);
 export function stopBacking() { if (sched) sched.stop(); sched = null; state = null; }
 export const isBackingRunning = () => !!(sched && sched.running);
 export { buildBacking };

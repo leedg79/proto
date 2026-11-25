@@ -11,13 +11,13 @@ export function stopLick() { timers.forEach(clearTimeout); timers = []; if (play
 
 // lick: realize() 결과(events, feel), onEvent(i | -1 끝)
 // opts: onEvent, countIn(준비 박 수), click(박마다 클릭), silent(음은 내지 않고 강조·클릭만)
-export async function playLick(lick, bpm = 80, { onEvent, countIn = 0, click = false, silent = false } = {}) {
-  stopLick();
+export async function playLick(lick, bpm = 80, { onEvent, countIn = 0, click = false, silent = false, startAt = null, keep = false } = {}) {
+  if (!keep) stopLick();
   await unlockAudio();
   await loadInstrument("guitar");
   const ctx = getAudioContext();
   const spb = 60 / bpm;
-  const pre = ctx.currentTime + 0.12;
+  const pre = startAt != null ? startAt - countIn * spb : ctx.currentTime + 0.12;
   const start = pre + countIn * spb;
   for (let k = 0; k < countIn; k++) drum("click", pre + k * spb, k === 0 ? 1 : 0.7, masterOut(ctx));
   if (click) for (let t = 0; t < lick.ticks; t += 12) drum("click", start + (t / 12) * spb, t % 48 === 0 ? 0.8 : 0.45, masterOut(ctx));

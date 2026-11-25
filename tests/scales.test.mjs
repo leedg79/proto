@@ -76,22 +76,21 @@ test("S1 모양 익히기: 블록 5개(모드 7개), 구간은 마디 처음에�
   assert.ok(hide.segStart.every(i => i % 8 === 0));
 });
 
-test("S2 근음 순환: 4도·반음 순서, 다음 근음은 가까운 모양", () => {
+test("근음 문제: 고른 구간 안에 모양 배치, 4도·반음·무작위 순서", () => {
   assert.deepEqual(DR.rootOrder("fourths", 0).slice(0, 4), [0, 5, 10, 3]);
   assert.deepEqual(DR.rootOrder("chromatic", 9).slice(0, 3), [9, 10, 11]);
   assert.deepEqual([...DR.rootOrder("random", 0, () => 0.5)].sort((x, y) => x - y), [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
-  for (const id of Object.keys(S.SCALES)) {
-    const r = DR.rootSegments(id, DR.rootOrder("fourths", 9));
-    assert.equal(r.segments.length, 12);
-    for (let i = 1; i < 12; i++) {
-      const a = r.segments[i - 1], b = r.segments[i];
-      const ca = (Math.min(...a.shape.map(n => n.f)) + Math.max(...a.shape.map(n => n.f))) / 2;
-      const cb = (Math.min(...b.shape.map(n => n.f)) + Math.max(...b.shape.map(n => n.f))) / 2;
-      assert.ok(Math.abs(ca - cb) <= 4, `${id} ${a.prompt}→${b.prompt} 손 이동 ${ca}→${cb}`);
-      assert.ok(Math.max(...b.shape.map(n => n.f)) <= 15);
-      assert.ok(b.notes.some(n => n.root));
+  for (const id of Object.keys(S.SCALES)) for (const [rid, lo, hi] of [["0-4", 0, 4], ["5-9", 5, 9], ["12-16", 12, 16]]) {
+    const d = DR.rootDeck({ scaleId: id, order: "fourths", startPc: 9, regionId: rid });
+    assert.equal(d.length, 12);
+    for (const p of d) {
+      assert.ok(p.lo >= lo - 2 && p.hi <= hi + 2, `${id} ${rid} ${p.main} ${p.lo}-${p.hi}`);
+      assert.ok(p.shape.some(n => n.root));
+      assert.equal(p.region.label, `${lo}~${hi}프렛`);
     }
   }
+  const r = DR.rootDeck({ scaleId: "minor-penta", regionId: "random" }, () => 0.99);
+  assert.equal(r[0].region.id, "12-16");
 });
 
 test("S3 시작음: 모든 음에서 한 번씩, 시작음에서 한 옥타브, 관계 스케일", () => {
@@ -114,19 +113,27 @@ test("S3 시작음: 모든 음에서 한 번씩, 시작음에서 한 옥타브, 
   assert.equal(DR.relatedScale(9, "minor-penta", 3), "C 메이저 펜타토닉");
 });
 
-test("S4 모드 전환: 밝은 순서, 이웃 모드는 한 음만 다름, 같은 위치", () => {
+test("모드 문제: 밝은 순서, 이웃 모드는 한 음만 다름, 같은 구간", () => {
   const order = DR.modeOrder(["dorian", "ionian", "lydian", "locrian", "phrygian", "aeolian", "mixolydian"], "bright");
   assert.deepEqual(order, DR.BRIGHTNESS);
-  const m = DR.modeSegments(9, order);
-  assert.equal(m.segments[0].changed.length, 0);
+  const m = DR.modeDeck({ rootPc: 9, modes: order, regionId: "5-9" });
+  assert.equal(m[0].changed.length, 0);
   for (let i = 1; i < 7; i++) {
-    const sub = m.segments[i].sub;
-    assert.ok(sub.includes("바뀐 음:") && !sub.includes("·"), `${m.segments[i].prompt}: ${sub}`);
-    assert.ok(m.segments[i].changed.length >= 1);
-    assert.equal(Math.min(...m.segments[i].shape.filter(n => n.s === 6).map(n => n.f)), 5); // A 근음 6번 줄 5프렛
+    assert.ok(m[i].answer.includes("바뀐 음:") && !m[i].answer.includes("·"), `${m[i].main}: ${m[i].answer}`);
+    assert.ok(m[i].changed.length >= 1);
+    assert.ok(m[i].lo >= 3 && m[i].hi <= 11, `${m[i].main} ${m[i].lo}-${m[i].hi}`);
   }
+  assert.equal(m[1].answer, "Lydian에서 바뀐 음: 4");
   assert.deepEqual(DR.modeOrder(["ionian", "dorian"], "dark"), ["dorian", "ionian"]);
   assert.equal(S.degreeOf(6, "lydian"), "♯4");
+});
+
+test("시작음: 고른 구간 안에서 시작", () => {
+  for (const id of ["minor-penta", "major", "dorian", "m7"]) for (const [rid, lo, hi] of [["0-4", 0, 4], ["9-13", 9, 13]]) {
+    const d = DR.startDeck(4, id, Math.random, rid);
+    assert.equal(d.length, S.SCALES[id].steps.length);
+    for (const p of d) assert.ok(p.f >= lo && p.f <= hi, `${id} ${rid} ${p.s}-${p.f}`);
+  }
 });
 
 test("Block Transition: 블록 1에서 시작, 중간 줄 슬라이드로 블록 2로 넘어가 최고음까지", () => {
@@ -168,3 +175,19 @@ test("Block Transition: 모든 스케일·키·모양에서 경로 생성, 슬�
   }
 });
 
+
+test("코드 전환하며 익히기: 진행·스케일 매핑", async () => {
+  const C = await import("../js/modules/scales/chordscale-core.js");
+  for (const lv of ["pb", "mm", "md"]) for (const id of Object.keys(C.CS_PROGS[lv])) for (const key of [0, 9, 7]) {
+    const p = C.chordScalePlan(lv, id, key);
+    for (const b of p.bars) {
+      assert.ok(S.SCALES[b.scaleId], `${lv} ${id} ${b.scaleId}`);
+      // 코드 근음은 쓰는 스케일 안에 있어야 함
+      const pcs = S.scalePcs(b.scaleRoot, b.scaleId);
+      // 펜타(5음)는 IV·♭VI 근음이 없을 수 있음(코드톤 착지로 연습) → 7음 스케일만 검사
+      if (lv !== "pb") assert.ok(pcs.includes(b.rootPc), `${lv} ${id} ${key} ${b.name} 근음`);
+    }
+  }
+  const m = C.chordScalePlan("md", "251-modes", 0);
+  assert.deepEqual(m.bars.map(b => `${b.name}:${b.scaleId}`), ["Dm7:dorian", "G7:mixolydian", "Cmaj7:ionian", "Cmaj7:ionian"]);
+});

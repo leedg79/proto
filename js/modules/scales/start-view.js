@@ -7,33 +7,27 @@ import { scaleTitle, SCALES } from "../../theory/scales.js";
 import { scaleBoardSvg } from "../../render/scaleboard.js";
 import { getSetting, setSetting } from "../../core/storage.js";
 import { esc, keyPickerHtml, bindPicker, readSel, segHtml, makeStore, pickKey } from "./common.js";
+import { regionTimeHtml, bindRegionTime, readRegionTime } from "./prompt-drill.js";
 
-const store = makeStore("fretlab:stn1");
+const store = makeStore("fretlab:stn2");
 export const clearFinder = () => store.clear();
 
 export function settingsHtml() {
-  const t = D.clampTime(getSetting("stn.time", D.TIME_DEFAULT));
   return `
     <div class="field"><label>키</label>${keyPickerHtml("stnKey", "stn.key")}</div>
     <div class="field" style="margin-top:14px"><label>지시 방식</label>${segHtml("stnLevel", D.START_LEVELS, getSetting("stn.level", "easy"))}
       <p class="muted small" style="margin:6px 0 0">줄 + 음 이름: "6번 줄 G에서" / 줄 + 도수: "6번 줄 4도음에서"(어떤 음인지 직접 떠올림)</p></div>
-    <div class="field" style="margin-top:14px">
-      <label for="stnTime">제한시간 <b id="stnTimeOut">${t}초</b></label>
-      <input id="stnTime" type="range" min="${D.TIME_MIN}" max="${D.TIME_MAX}" step="1" value="${t}">
-    </div>
-    <p class="muted small" style="margin:4px 0 0">시작음에서 같은 블록 안으로 한 옥타브 올라갔다 내려오기(위쪽이 블록을 벗어나면 내려갔다 올라오기). 스케일의 모든 음에서 한 번씩 시작하면 완료 1회</p>`;
+    ${regionTimeHtml("stn")}
+    <p class="muted small" style="margin:4px 0 0">시작음(구간 안)에서 같은 블록 안으로 한 옥타브 올라갔다 내려오기(위쪽이 블록을 벗어나면 내려갔다 올라오기). 스케일의 모든 음에서 한 번씩 시작하면 완료 1회</p>`;
 }
 export function bindSettings(root) {
-  bindPicker(root, "stnKey"); bindPicker(root, "stnLevel");
-  const r = root.querySelector("#stnTime");
-  r.oninput = () => { root.querySelector("#stnTimeOut").textContent = r.value + "초"; };
+  bindPicker(root, "stnKey"); bindPicker(root, "stnLevel"); bindRegionTime(root, "stn");
 }
 export function readSettings(root) {
   const key = Number(readSel(root, "stnKey"));
   const level = readSel(root, "stnLevel", "v") === "hard" ? "hard" : "easy";
-  const timeLimit = D.clampTime(root.querySelector("#stnTime").value);
-  setSetting("stn.key", key); setSetting("stn.level", level); setSetting("stn.time", timeLimit);
-  return { key, level, timeLimit };
+  setSetting("stn.key", key); setSetting("stn.level", level);
+  return { key, level, ...readRegionTime(root, "stn") };
 }
 
 export function mount(container, api) {
@@ -42,7 +36,7 @@ export function mount(container, api) {
   const list = scales.length ? scales : ["minor-penta"];
   const o = s0.options || {};
   const level = o.level === "hard" ? "hard" : "easy";
-  const newDeck = n => { const scaleId = list[n % list.length]; return D.startDeck(pickKey(o.key ?? -1), scaleId); };
+  const newDeck = n => { const scaleId = list[n % list.length]; return D.startDeck(pickKey(o.key ?? -1), scaleId, Math.random, o.region || "5-9"); };
   let st = store.load(s0.id) || { cycleNo: 0, deck: newDeck(0), index: -1, done: 0, units: 0, promptNo: 0, timeLimit: D.clampTime(o.timeLimit), current: null };
 
   container.innerHTML = `
@@ -97,7 +91,7 @@ export function mount(container, api) {
     const dirText = p.up ? "한 옥타브 올라갔다 내려오기" : "한 옥타브 내려갔다 올라오기";
     $("#stnScale").textContent = scaleTitle(p.rootPc, p.scaleId);
     $("#stnMain").textContent = level === "hard" ? (p.degree === "R" ? "근음" : `${p.degree}도음`) : p.noteName;
-    $("#stnSub").textContent = `${p.s}번 줄에서 · ${dirText}`;
+    $("#stnSub").textContent = `${p.s}번 줄에서 · ${dirText}${p.region ? ` · ${p.region.label}` : ""}`;
     $("#stnReveal").classList.toggle("hidden", c.revealed);
     $("#stnNext").classList.toggle("hidden", !c.revealed);
     const ans = $("#stnAnswer");

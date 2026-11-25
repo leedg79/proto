@@ -22,7 +22,7 @@ export const STYLES = { straight: "스트레이트(록·팝)", shuffle: "셔플(
 
 const DEGREE = { i: 0, ii: 2, iii: 4, iv: 5, v: 7, vi: 9, vii: 11 };
 // 코드 종류 → 구성음(반음)
-const QUALITY = {
+export const QUALITY = {
   "": [0, 4, 7], m: [0, 3, 7], "7": [0, 4, 7, 10], maj7: [0, 4, 7, 11], m7: [0, 3, 7, 10],
   "ø7": [0, 3, 6, 10], "7♭9": [0, 4, 7, 10, 13]
 };
@@ -64,9 +64,13 @@ const bassRoot = pc => 28 + mod(pc - 4);          // E1(28) ~ D♯2(39)
 // compPattern: [{ b: 박 위치, d: 길이(박), up, mute }] 이 있으면 코드 반주를 이 리듬으로, comp: false면 코드 반주 없음
 // voicer(bar, i) → midis 가 있으면 그 보이싱 사용
 export function buildBacking({ prog = "blues12", key = 9, style = null, compPattern = null, comp = true, voicer = null }, rand = Math.random) {
-  const P = PROGRESSIONS[prog] || PROGRESSIONS.blues12;
-  const st = style || P.style;
-  const bars = P.bars.map(tok => { const c = parseRoman(tok); return { tok, rootPc: mod(key + c.root), quality: c.quality, name: chordName(key, tok) }; });
+  // prog: 진행 이름 또는 { bars: [토큰], style }. 토큰 "iim7|V7" = 한 마디에 2박씩
+  // custom: [{ segs: [{ rootPc, quality, beats, name }] }] 이면 그대로 사용(릭의 코드 진행 등)
+  const P = typeof prog === "object" ? prog : PROGRESSIONS[prog] || PROGRESSIONS.blues12;
+  const st = style || P.style || "straight";
+  const seg = (tok, beats) => { const c = parseRoman(tok); return { rootPc: mod(key + c.root), quality: c.quality, name: chordName(key, tok), beats }; };
+  const raw = arguments[0].custom || P.bars.map(tok => ({ segs: tok.split("|").map((t, _, a) => seg(t, 4 / a.length)) }));
+  const bars = raw.map(b => ({ ...b.segs[0], segs: b.segs, name: b.segs.map(x => x.name).join(" / "), tok: b.segs.length === 1 ? "" : "split" }));
   const ev = [];
   bars.forEach((b, i) => {
     const t0 = i * 4;
@@ -91,6 +95,22 @@ export function buildBacking({ prog = "blues12", key = 9, style = null, compPatt
       for (const x of hats) ev.push({ part: "drums", beat: t0 + x, kind: "hat", vel: x % 1 ? 0.6 : 0.9 });
       for (const x of st === "straight" ? [0, 2, 2.5] : [0, 2]) ev.push({ part: "drums", beat: t0 + x, kind: "kick", vel: 1 });
       for (const x of [1, 3]) ev.push({ part: "drums", beat: t0 + x, kind: "snare", vel: 1 });
+    }
+    // 한 마디에 코드가 2개 이상이면 코드마다 짧은 베이스·반주
+    if (b.segs.length > 1) {
+      let at = 0;
+      for (const sg of b.segs) {
+        const R2 = bassRoot(sg.rootPc), iv = QUALITY[sg.quality];
+        ev.push({ part: "bass", beat: t0 + at, dur: 0.9, midi: R2, vel: 0.9 });
+        if (sg.beats >= 2) ev.push({ part: "bass", beat: t0 + at + 1, dur: 0.9, midi: R2 + (st === "swing" ? iv[2] : 7), vel: 0.8 });
+        if (comp) {
+          const v2 = voicing(sg.rootPc, sg.quality);
+          const hits = compPattern ? compPattern.filter(h => h.b >= at && h.b < at + sg.beats) : st === "swing" ? [{ b: at, d: 0.7 }, ...(sg.beats >= 2 ? [{ b: at + 1.5, d: 0.3 }] : [])] : [{ b: at, d: Math.min(0.9, sg.beats - 0.1) }];
+          for (const h of hits) ev.push({ part: "comp", beat: t0 + h.b, dur: h.mute ? 0.08 : h.d ?? 0.4, midis: v2, vel: 0.48, up: !!h.up, mute: !!h.mute });
+        }
+        at += sg.beats;
+      }
+      return;
     }
     // 베이스
     if (st === "bossa") {
