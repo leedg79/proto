@@ -11,13 +11,15 @@ import * as RandomChord from "./modules/chords/random-view.js";
 import * as BpmChord from "./modules/chords/bpm-view.js";
 import * as PlaySession from "./modules/chords/play-view.js";
 import { KEYS as PLAY_KEYS, STYLES as PLAY_STYLES } from "./modules/chords/play-core.js";
-import * as ScaleInterval from "./modules/scales/interval-view.js";
-import * as ScaleLearning from "./modules/scales/learning-view.js";
-import * as ScaleTransition from "./modules/scales/transition-view.js";
+import * as ScaleShape from "./modules/scales/shape-view.js";
 import * as ScaleRoot from "./modules/scales/root-view.js";
+import * as ScaleRootCycle from "./modules/scales/rootcycle-view.js";
+import * as ScaleStart from "./modules/scales/start-view.js";
+import * as ScaleMode from "./modules/scales/mode-view.js";
+import * as ScaleTransition from "./modules/scales/transition-view.js";
 import { renderDictionary } from "./modules/chords/dictionary-view.js";
 
-const APP_VERSION = "1.6.1";
+const APP_VERSION = "1.7.0";
 
 // 구현된 과제의 연습 화면 (모듈/과제 → 화면 모듈)
 // 화면 모듈: settingsHtml, bindSettings, readSettings, mount, clearFinder
@@ -26,13 +28,15 @@ const CONTENT = {
   "chords/random-chord": RandomChord,
   "chords/bpm-chord": BpmChord,
   "chords/play-session": PlaySession,
-  "scales/interval-finding": ScaleInterval,
-  "scales/block-learning": ScaleLearning,
-  "scales/block-transition": ScaleTransition,
-  "scales/block-root": ScaleRoot
+  "scales/shape-learning": ScaleShape,
+  "scales/shape-root": ScaleRoot,
+  "scales/root-cycle": ScaleRootCycle,
+  "scales/start-note": ScaleStart,
+  "scales/mode-switch": ScaleMode,
+  "scales/neck-transition": ScaleTransition
 };
-// S5(Chord-Scale Application)는 반주 엔진 단계에서 구현
-const NOT_YET = new Set(["scales/s5"]);
+// S6(화성 적용)는 반주 음원 단계에서 구현
+const NOT_YET = new Set(["scales/s6"]);
 const contentFor = (mod, task, level) => (NOT_YET.has(`${mod}/${level}`) ? null : CONTENT[`${mod}/${task}`] || null);
 function clearContent() { Object.values(CONTENT).forEach(c => c.clearFinder && c.clearFinder()); }
 

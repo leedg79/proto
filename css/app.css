@@ -471,3 +471,11 @@ h1, h2, h3 { margin: 0; line-height: 1.25; }
 @keyframes blink { from { opacity: 1; } to { opacity: .35; } }
 .sb-state { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin: 4px 2px 6px; }
 .sb-board { background: #0f151f; border: 1px solid var(--line); border-radius: 14px; padding: 6px; }
+
+/* Scales 공용 연주 화면 */
+.sp-prompt { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin: 10px 0 4px; }
+.sp-prompt b { font-size: 34px; line-height: 1.1; color: var(--accent, #a6f36b); letter-spacing: .01em; }
+.sp-prompt span { color: var(--muted, #8f9bad); font-size: 14px; }
+.sb-board.checking { outline: 2px solid #a6f36b55; border-radius: 12px; }
+.st-run { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+.st-run span { font-size: 12px; padding: 2px 6px; border-radius: 6px; background: #1e2633; color: #c9d1db; }

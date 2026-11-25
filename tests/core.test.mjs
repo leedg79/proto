@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import * as C from "../js/core/clock.js";
 import * as J from "../js/core/journal.js";
 import * as B from "../js/core/backup.js";
-import { MODULES, UNIT } from "../js/data/catalog.js";
+import { MODULES, UNIT, taskName } from "../js/data/catalog.js";
 
 const T0 = new Date(2026, 10, 25, 12, 3, 10).getTime(); // 2026-11-25 12:03:10 (기기 시간대)
 const sec = n => n * 1000;
@@ -146,15 +146,17 @@ test("병합 계획 계산", () => {
 
 test("레벨·완료 단위 정의가 결정 사항과 일치", () => {
   const counts = Object.fromEntries(MODULES.map(m => [m.id, m.levels.length]));
-  assert.deepEqual(counts, { notes: 2, chords: 5, rhythm: 4, scales: 5, ear: 4 });
+  assert.deepEqual(counts, { notes: 2, chords: 5, rhythm: 4, scales: 6, ear: 4 });
   const notes = MODULES.find(m => m.id === "notes");
   assert.equal(notes.levels[0].tasks[0].unit, UNIT.noteCycle);
   const ear = MODULES.find(m => m.id === "ear");
   assert.equal(ear.levels[0].tasks[0].unit.size, 24);
   assert.equal(ear.levels[1].tasks[0].unit.size, 24);
   const scales = MODULES.find(m => m.id === "scales");
-  assert.equal(scales.levels[0].tasks.find(t => t.id === "block-learning").unit.size, 5);
-  assert.equal(scales.levels[3].tasks.find(t => t.id === "block-learning").unit.size, 7);
+  assert.deepEqual(scales.levels.map(l => l.tasks.map(t => t.id).join(",")), ["shape-learning,shape-root", "root-cycle", "start-note", "mode-switch", "neck-transition", "chord-scale"]);
+  assert.equal(scales.levels[1].tasks[0].unit.size, 12);
+  // 이전 구성 기록은 이름 뒤에 (이전 구성)
+  assert.equal(taskName("scales", "s2", "block-learning"), "Block Scale Learning (이전 구성)");
   const chords = MODULES.find(m => m.id === "chords");
   assert.deepEqual(chords.levels[4].tasks.map(t => t.id), ["play-session", "chord-dictionary"]);
 });
@@ -162,8 +164,9 @@ test("레벨·완료 단위 정의가 결정 사항과 일치", () => {
 test("학습 주제: 목록·기록·일간 집계", async () => {
   const { topicsFor, topicLabel } = await import("../js/data/catalog.js");
   assert.deepEqual(topicsFor("chords", "c1", "random-chord").map(t => t.name), ["오픈 코드", "메이저·마이너 트라이어드", "파워 코드"]);
-  assert.deepEqual(topicsFor("scales", "s2", "block-learning").map(t => t.id), ["major-penta", "minor-penta", "blues"]);
-  assert.equal(topicsFor("scales", "s4", "block-learning").length, 7);
+  assert.equal(topicsFor("scales", "s2", "root-cycle").length, 20);
+  assert.deepEqual(topicsFor("scales", "s4", "mode-switch").map(t => t.id), ["ionian", "dorian", "phrygian", "lydian", "mixolydian", "aeolian", "locrian"]);
+  assert.ok(topicsFor("scales", "s6", "chord-scale").every(t => t.pending));
   assert.equal(topicsFor("chords", "c5", "play-session")[0].name, "보이스 리딩");
   assert.equal(topicsFor("rhythm", "r2", "fingerstyle").length, 2);
   assert.deepEqual(topicsFor("notes", "n1", "note-finder"), []);
