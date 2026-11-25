@@ -1,0 +1,8 @@
+FRET LAB 악기 음원 출처
+
+guitar(electric_guitar_clean), acoustic(acoustic_guitar_steel), bass(electric_bass_finger)
+- 원본: Fluid (R3) SoundFont, Copyright (c) 2000-2002, 2008 Frank Wen - MIT License로 공개
+- 변환본: gleitz/midi-js-soundfonts (https://github.com/gleitz/midi-js-soundfonts) FluidR3_GM, 저장소 표기 Creative Commons Attribution 3.0
+- 이 앱에서는 위 파일에서 3반음 간격 음만 추려 mp3로 저장함(tools/build_sounds.py)
+
+드럼: 앱 안에서 Web Audio로 합성(샘플 없음)
