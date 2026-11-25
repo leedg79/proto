@@ -184,3 +184,51 @@ export function taskName(moduleId, levelId, taskId) {
 }
 
 export const MODULE_ORDER = MODULES.map(m => m.id);
+
+// ── 학습 주제 (세션 시작 전 선택, 1개 이상 복수 선택 가능) ──
+// 레벨 공통 주제. 과제별로 다른 경우는 TASK_TOPICS가 우선함
+const tp = list => list.map(([id, name]) => ({ id, name }));
+
+const LEVEL_TOPICS = {
+  "chords/c1": tp([["open", "오픈 코드"], ["triad", "메이저·마이너 트라이어드"], ["power", "파워 코드"]]),
+  "chords/c2": tp([["barre", "바레·이동형 코드"], ["dim-aug-sus", "디미니시드·어그먼티드·서스펜디드"], ["triad-inversion", "트라이어드 전위"], ["string-set-triad", "현 그룹별 트라이어드"], ["caged", "CAGED"], ["seventh", "7th 코드"]]),
+  "chords/c3": tp([["seventh-inversion", "7th 코드 전위"], ["shell", "Shell Voicing"], ["drop2", "Drop 2"], ["drop3", "Drop 3"], ["tension", "텐션(9·11·13)"]]),
+  "chords/c4": tp([["substitute", "대리 코드"], ["slash", "슬래시 코드"], ["open-voicing", "Open Voicing"], ["quartal", "Quartal Voicing"]]),
+  "chords/c5": tp([["voice-leading", "보이스 리딩"], ["genre-comping", "장르별 컴핑"], ["chord-melody", "코드 멜로디"]]),
+  "scales/s1": tp([["maj", "메이저"], ["min", "마이너"], ["maj7", "maj7"], ["dom7", "7"], ["m7", "m7"], ["m7b5", "m7♭5"]]),
+  "scales/s2": tp([["major-penta", "메이저 펜타토닉"], ["minor-penta", "마이너 펜타토닉"], ["blues", "블루스 스케일"]]),
+  "scales/s3": tp([["major", "메이저"], ["natural-minor", "내추럴 마이너"], ["harmonic-minor", "하모닉 마이너"], ["melodic-minor", "멜로딕 마이너"]]),
+  "scales/s4": tp([["ionian", "Ionian"], ["dorian", "Dorian"], ["phrygian", "Phrygian"], ["lydian", "Lydian"], ["mixolydian", "Mixolydian"], ["aeolian", "Aeolian"], ["locrian", "Locrian"]]),
+  "rhythm/r1": tp([["4beat", "4비트"], ["8beat", "8비트"], ["16beat", "16비트"]]),
+  "rhythm/r3": tp([["chord-tone", "코드톤 피킹"], ["scale", "스케일 피킹"], ["alternate", "얼터네이트"], ["string-skip", "스트링 스킵"], ["position-shift", "포지션 이동"]]),
+  "rhythm/r4": tp([["riff", "리프"], ["syncopation", "싱코페이션 프레이즈"], ["repeat-vary", "반복·변형"], ["chord-based", "코드 기반"], ["scale-based", "스케일 기반"]]),
+  "ear/e2": tp([["2-3", "2·3도"], ["4-5", "4·5도"], ["6-7", "6·7도"], ["octave-compound", "옥타브·복합 음정"]]),
+  "ear/e4": tp([["blues", "Blues"], ["rock", "Rock"], ["funk", "Funk"], ["jazz", "Jazz"]])
+};
+
+const TASK_TOPICS = {
+  "rhythm/r2/comping": tp([["chord-rhythm", "코드 리듬"], ["cutting", "커팅"], ["mute", "뮤트"], ["syncopation", "싱코페이션"]]),
+  "rhythm/r2/fingerstyle": tp([["arpeggio", "아르페지오"], ["bass-chord", "베이스+코드"]]),
+  "rhythm/r2/percussive": tp([["body-hit", "바디 타격"], ["palm-mute", "팜뮤트"], ["string-hit", "스트링 히트"]]),
+  "ear/e3/chord-ear": tp([["triads", "트라이어드 5종"], ["sevenths", "7th 5종"], ["tensions", "텐션"], ["progressions", "코드 진행"]]),
+  "ear/e3/melodic": [],
+  "ear/e3/harmonic": []
+};
+
+// 과제의 선택 가능한 학습 주제 (없으면 빈 배열 → 주제 선택 없이 시작)
+export function topicsFor(moduleId, levelId, taskId) {
+  const t = findTask(moduleId, levelId, taskId);
+  if (!t || t.reference) return [];
+  const k = `${moduleId}/${levelId}/${taskId}`;
+  if (k in TASK_TOPICS) return TASK_TOPICS[k];
+  return LEVEL_TOPICS[`${moduleId}/${levelId}`] || [];
+}
+
+export function topicName(moduleId, levelId, taskId, topicId) {
+  const t = topicsFor(moduleId, levelId, taskId).find(x => x.id === topicId);
+  return t ? t.name : topicId;
+}
+
+export function topicLabel(moduleId, levelId, taskId, ids) {
+  return (ids || []).map(id => topicName(moduleId, levelId, taskId, id)).join(" + ");
+}

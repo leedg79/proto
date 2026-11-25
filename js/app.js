@@ -1,5 +1,5 @@
 // FRET LAB 1단계: 화면 라우터와 화면 구성
-import { MODULES, findModule, findLevel, findTask, moduleName, levelName, taskName, SESSION_TYPES, MODULE_ORDER } from "./data/catalog.js";
+import { MODULES, findModule, findLevel, findTask, moduleName, levelName, taskName, SESSION_TYPES, MODULE_ORDER, topicsFor, topicLabel } from "./data/catalog.js";
 import * as Store from "./core/storage.js";
 import * as S from "./core/session.js";
 import { formatDuration, formatShort, localDateKey } from "./core/clock.js";
@@ -8,7 +8,7 @@ import * as B from "./core/backup.js";
 import * as Metro from "./audio/metronome.js";
 import * as NoteFinder from "./modules/notes/finder-view.js";
 
-const APP_VERSION = "1.1.0";
+const APP_VERSION = "1.2.0";
 
 // 구현된 과제의 연습 화면 (모듈/과제 → 화면 모듈)
 // 화면 모듈: settingsHtml, bindSettings, readSettings, mount, clearFinder
@@ -258,6 +258,10 @@ function renderTask(modId, lvlId, taskId) {
   }
   const otherActive = !!active;
   const content = contentFor(modId, taskId);
+  const topics = topicsFor(modId, lvlId, taskId);
+  const topicKey = `topics:${modId}/${lvlId}/${taskId}`;
+  const savedTopics = Store.getSetting(topicKey, null);
+  const selected = new Set((savedTopics || [topics[0] && topics[0].id]).filter(id => topics.some(t => t.id === id)));
   view.innerHTML = `
     <div class="session-layout">
       <div class="panel session-head span-all">
@@ -268,10 +272,15 @@ function renderTask(modId, lvlId, taskId) {
           <span class="tag">${esc(t.unit.label)}</span>
         </div>
       </div>
+      ${topics.length ? `<div class="panel span-all" id="topicPanel">
+        <div class="topic-head"><h3 class="panel-title">학습 주제</h3><button type="button" class="btn small ghost" id="topicAll">전체 선택</button></div>
+        <div class="topic-list">${topics.map(tp => `<label class="topic"><input type="checkbox" value="${esc(tp.id)}" ${selected.has(tp.id) ? "checked" : ""}><span>${esc(tp.name)}</span></label>`).join("")}</div>
+        <p class="muted small" style="margin:10px 0 0">1개만 고르거나 여러 개를 골라 섞어 연습할 수 있음</p>
+      </div>` : ""}
       ${content ? `<div class="panel span-all"><h3 class="panel-title">세션 설정</h3>${content.settingsHtml(lvlId)}</div>` : `<div class="panel placeholder span-all">
         ${t.reference
           ? `<b>참고 기능</b><br>Chord Dictionary는 연습 세션이 아니라 참고 기능이라 기록하지 않음. 사전 화면은 ${m.stage}단계에서 구현 예정임`
-          : `<b>학습 콘텐츠 준비 중</b><br>이 과제의 실제 연습 화면은 개발 ${m.stage}단계에서 구현됨. 지금은 세션 시작·일시정지·종료와 기록·학습일지만 사용할 수 있음`}
+          : `<b>학습 콘텐츠 준비 중</b><br>이 과제의 실제 연습 화면은 개발 ${m.stage}단계에서 구현됨. 지금은 학습 주제를 골라 세션 시작·일시정지·종료와 기록·학습일지를 사용할 수 있음`}
       </div>`}
       ${t.reference ? "" : `
       <div class="span-all">
@@ -281,8 +290,22 @@ function renderTask(modId, lvlId, taskId) {
       </div>`}
     </div>`;
   if (content) content.bindSettings(view);
+  const readTopics = () => $$("#topicPanel input:checked").map(i => i.value);
+  if ($("#topicAll")) {
+    const syncAll = () => { $("#topicAll").textContent = readTopics().length === topics.length ? "전체 해제" : "전체 선택"; };
+    $("#topicAll").onclick = () => {
+      const all = readTopics().length !== topics.length;
+      $$("#topicPanel input").forEach(i => { i.checked = all; });
+      syncAll();
+    };
+    $("#topicPanel").addEventListener("change", syncAll);
+    syncAll();
+  }
   const btn = $("#startBtn");
   if (btn) btn.onclick = async () => {
+    const chosen = readTopics();
+    if (topics.length && !chosen.length) { toast("학습 주제를 1개 이상 선택해야 함"); return; }
+    if (topics.length) Store.setSetting(topicKey, chosen);
     const options = content ? content.readSettings(view) : {};
     if (S.getActive()) {
       const cur = S.getActive();
@@ -297,7 +320,7 @@ function renderTask(modId, lvlId, taskId) {
       await S.endSession();
     }
     clearContent();
-    S.startSession({ module: modId, level: lvlId, task: taskId, type: t.type, options });
+    S.startSession({ module: modId, level: lvlId, task: taskId, type: t.type, options, topics: chosen });
     holdScreen(true);
     go("session", { replace: true });
   };
@@ -336,7 +359,7 @@ function renderSession() {
       <div class="panel session-head span-all">
         <div class="crumbs">${esc(moduleName(s0.module))} · ${esc(levelName(s0.module, s0.level))}</div>
         <h1>${esc(taskName(s0.module, s0.level, s0.task))}</h1>
-        <span class="tag accent">${esc(SESSION_TYPES[s0.type] || s0.type)}</span>
+        <div class="tag-row"><span class="tag accent">${esc(SESSION_TYPES[s0.type] || s0.type)}</span>${(s0.topics || []).map(id => `<span class="tag">${esc(topicLabel(s0.module, s0.level, s0.task, [id]))}</span>`).join("")}</div>
       </div>
       <div class="autopause span-all hidden" id="autoNote">앱을 벗어나 자동으로 일시정지됐음. 벗어나 있던 시간은 연습시간에 포함되지 않음. 재개를 누르면 이어서 측정함</div>`;
   view.innerHTML = content ? `
@@ -501,7 +524,7 @@ function renderDone(id) {
     const pauseSec = r.pauses.reduce((a, p) => a + (Date.parse(p.to) - Date.parse(p.from)) / 1000, 0);
     view.innerHTML = `
       <div class="page-head"><div class="eyebrow">Session Complete</div><h1>세션 기록 완료</h1>
-        <p>${esc(moduleName(r.module))} · ${esc(levelName(r.module, r.level))} · ${esc(taskName(r.module, r.level, r.task))}</p></div>
+        <p>${esc(moduleName(r.module))} · ${esc(levelName(r.module, r.level))} · ${esc(taskName(r.module, r.level, r.task))}${r.topics && r.topics.length ? `<br>${esc(topicLabel(r.module, r.level, r.task, r.topics))}` : ""}</p></div>
       <div class="result-grid">
         <div class="stat"><div class="k">실제 연습시간</div><div class="v">${formatDuration(r.activeSec)}</div></div>
         <div class="stat"><div class="k">완료 횟수</div><div class="v">${r.completedUnits}회</div></div>
@@ -648,7 +671,8 @@ function drawDay(list, key) {
         <div class="hd"><span style="display:flex;gap:8px;align-items:center"><span class="dot"></span>${esc(moduleName(id))}</span>${figs(mo)}</div>
         ${Object.entries(mo.levels).sort().map(([lid, la]) => `<div class="tree-level">
           <div class="lh"><span>${esc(levelName(id, lid))}</span>${figs(la)}</div>
-          ${Object.entries(la.tasks).map(([tid, ta]) => `<div class="tree-task"><span>${esc(taskName(id, lid, tid))} · ${ta.sessions}세션</span>${figs(ta)}</div>`).join("")}
+          ${Object.entries(la.tasks).map(([tid, ta]) => `<div class="tree-task"><span>${esc(taskName(id, lid, tid))} · ${ta.sessions}세션</span>${figs(ta)}</div>
+            ${Object.entries(ta.topics || {}).map(([k, tpa]) => `<div class="tree-topic"><span>${esc(topicLabel(id, lid, tid, k.split("+")))}</span>${figs(tpa)}</div>`).join("")}`).join("")}
         </div>`).join("")}
       </div>`;
     }).join("")}</div>
@@ -667,7 +691,7 @@ function logItem(r) {
     <summary>
       <span class="t">${hm(r.startedAt)}</span>
       <span class="m"><span style="display:inline-flex;gap:6px;align-items:center"><span class="dot"></span>${esc(moduleName(r.module))}</span>
-        <small>${esc(levelName(r.module, r.level))} · ${esc(taskName(r.module, r.level, r.task))}</small></span>
+        <small>${esc(levelName(r.module, r.level))} · ${esc(taskName(r.module, r.level, r.task))}${r.topics && r.topics.length ? " · " + esc(topicLabel(r.module, r.level, r.task, r.topics)) : ""}</small></span>
       <span class="r">${formatDuration(r.activeSec)}<small>완료 ${r.completedUnits}회</small></span>
     </summary>
     <div class="log-detail">
@@ -677,6 +701,7 @@ function logItem(r) {
         <dt>모듈</dt><dd>${esc(moduleName(r.module))}</dd>
         <dt>레벨</dt><dd>${esc(levelName(r.module, r.level))}</dd>
         <dt>과제</dt><dd>${esc(taskName(r.module, r.level, r.task))}</dd>
+        ${r.topics && r.topics.length ? `<dt>학습 주제</dt><dd>${esc(topicLabel(r.module, r.level, r.task, r.topics))}</dd>` : ""}
         <dt>세션 유형</dt><dd>${esc(SESSION_TYPES[r.type] || r.type || "-")}</dd>
         <dt>시작</dt><dd>${esc(r.startedAt.replace("T", " ").slice(0, 19))}</dd>
         <dt>종료</dt><dd>${esc(r.endedAt.replace("T", " ").slice(0, 19))}</dd>

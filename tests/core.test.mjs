@@ -158,3 +158,27 @@ test("레벨·완료 단위 정의가 결정 사항과 일치", () => {
   const chords = MODULES.find(m => m.id === "chords");
   assert.deepEqual(chords.levels[4].tasks.map(t => t.id), ["play-session", "chord-dictionary"]);
 });
+
+test("학습 주제: 목록·기록·일간 집계", async () => {
+  const { topicsFor, topicLabel } = await import("../js/data/catalog.js");
+  assert.deepEqual(topicsFor("chords", "c1", "random-chord").map(t => t.name), ["오픈 코드", "메이저·마이너 트라이어드", "파워 코드"]);
+  assert.deepEqual(topicsFor("scales", "s2", "block-learning").map(t => t.id), ["major-penta", "minor-penta", "blues"]);
+  assert.equal(topicsFor("scales", "s4", "block-learning").length, 7);
+  assert.equal(topicsFor("chords", "c5", "play-session")[0].name, "보이스 리딩");
+  assert.equal(topicsFor("rhythm", "r2", "fingerstyle").length, 2);
+  assert.deepEqual(topicsFor("notes", "n1", "note-finder"), []);
+  assert.deepEqual(topicsFor("chords", "c1", "chord-dictionary"), []);
+  assert.equal(topicLabel("chords", "c1", "random-chord", ["open", "power"]), "오픈 코드 + 파워 코드");
+
+  let s = C.createSession({ module: "chords", level: "c1", task: "random-chord", type: "finding", topics: ["power", "open"] }, T0);
+  const r1 = C.finish(s, T0 + sec(100));
+  assert.deepEqual(r1.topics, ["power", "open"]);
+  s = C.createSession({ module: "chords", level: "c1", task: "random-chord", type: "finding", topics: ["open", "power"] }, T0 + sec(200));
+  const r2 = C.finish(s, T0 + sec(260));
+  s = C.createSession({ module: "chords", level: "c1", task: "random-chord", type: "finding", topics: ["open"] }, T0 + sec(300));
+  const r3 = C.finish(s, T0 + sec(330));
+  const d = J.summarizeDay([r1, r2, r3], "2026-11-25");
+  const topics = d.modules.chords.levels.c1.tasks["random-chord"].topics;
+  assert.equal(topics["open+power"].sec, 160);   // 순서가 달라도 같은 조합
+  assert.equal(topics["open"].sec, 30);
+});

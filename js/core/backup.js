@@ -39,6 +39,8 @@ function normalize(r) {
   if (!Number.isFinite(out.startedAtMs)) out.startedAtMs = Date.parse(out.startedAt) || 0;
   if (!Number.isFinite(out.endedAtMs)) out.endedAtMs = Date.parse(out.endedAt) || 0;
   if (!Array.isArray(out.pauses)) out.pauses = [];
+  if (!Array.isArray(out.topics)) out.topics = [];
+  if (!out.options || typeof out.options !== "object") out.options = {};
   if (!out.schema) out.schema = 1;
   delete out.selfRating;
   return out;

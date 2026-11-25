@@ -61,10 +61,18 @@ export function summarizeDay(records, dateKey) {
     add(m, r);
     const l = ensure(m.levels, r.level, () => ({ ...blank(), tasks: {} }));
     add(l, r);
-    add(ensure(l.tasks, r.task), r);
+    const t = ensure(l.tasks, r.task, () => ({ ...blank(), topics: {} }));
+    add(t, r);
+    // 학습 주제 조합별 (여러 주제를 섞은 세션은 그 조합으로 집계)
+    const key = topicKey(r.topics);
+    if (key) add(ensure(t.topics, key), r);
   }
   out.sessions.sort((a, b) => (a.startedAtMs || 0) - (b.startedAtMs || 0));
   return out;
+}
+
+export function topicKey(topics) {
+  return Array.isArray(topics) && topics.length ? [...topics].sort().join("+") : "";
 }
 
 export function yearsWithData(records) {
