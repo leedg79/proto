@@ -146,7 +146,7 @@ test("병합 계획 계산", () => {
 
 test("레벨·완료 단위 정의가 결정 사항과 일치", () => {
   const counts = Object.fromEntries(MODULES.map(m => [m.id, m.levels.length]));
-  assert.deepEqual(counts, { notes: 2, chords: 4, rhythm: 4, scales: 5, ear: 4 });
+  assert.deepEqual(counts, { notes: 2, chords: 5, rhythm: 4, scales: 5, ear: 4 });
   const notes = MODULES.find(m => m.id === "notes");
   assert.equal(notes.levels[0].tasks[0].unit, UNIT.noteCycle);
   const ear = MODULES.find(m => m.id === "ear");
@@ -154,4 +154,7 @@ test("레벨·완료 단위 정의가 결정 사항과 일치", () => {
   assert.equal(ear.levels[1].tasks[0].unit.size, 24);
   const scales = MODULES.find(m => m.id === "scales");
   assert.equal(scales.levels[0].tasks.find(t => t.id === "block-learning").unit.size, 5);
+  assert.equal(scales.levels[3].tasks.find(t => t.id === "block-learning").unit.size, 7);
+  const chords = MODULES.find(m => m.id === "chords");
+  assert.deepEqual(chords.levels[4].tasks.map(t => t.id), ["play-session", "chord-dictionary"]);
 });

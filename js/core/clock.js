@@ -29,11 +29,12 @@ export function localIso(ms) {
 }
 
 // 진행 중 세션 생성 (시작 버튼을 누른 순간에만 호출)
-export function createSession({ module, level, task, type }, now, rand) {
+export function createSession({ module, level, task, type, options }, now, rand) {
   return {
     schema: SCHEMA_VERSION,
     id: newSessionId(now, rand),
     module, level, task, type,
+    options: options || {},
     status: "running",
     startedAt: now,
     segments: [{ start: now, end: null }],
@@ -134,7 +135,8 @@ export function finish(s, now) {
     endedAtMs: now,
     activeSec: Math.round(active / 1000),
     pauses: pauses.map(p => ({ from: localIso(p.from), to: localIso(p.to), reason: p.reason })),
-    completedUnits: s.completedUnits
+    completedUnits: s.completedUnits,
+    options: s.options || {}
   };
 }
 

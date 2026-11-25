@@ -75,6 +75,10 @@ export function subscribe(fn) {
 
 export function getActive() { return state; }
 
+export function elapsedMs() {
+  return state ? C.activeMs(state, now()) : 0;
+}
+
 export function elapsedSec() {
   return state ? C.activeMs(state, now()) / 1000 : 0;
 }

@@ -6,8 +6,17 @@ import { formatDuration, formatShort, localDateKey } from "./core/clock.js";
 import * as J from "./core/journal.js";
 import * as B from "./core/backup.js";
 import * as Metro from "./audio/metronome.js";
+import * as NoteFinder from "./modules/notes/finder-view.js";
 
-const APP_VERSION = "1.0.0";
+const APP_VERSION = "1.1.0";
+
+// 구현된 과제의 연습 화면 (모듈/과제 → 화면 모듈)
+// 화면 모듈: settingsHtml, bindSettings, readSettings, mount, clearFinder
+const CONTENT = {
+  "notes/note-finder": NoteFinder
+};
+const contentFor = (mod, task) => CONTENT[`${mod}/${task}`] || null;
+function clearContent() { Object.values(CONTENT).forEach(c => c.clearFinder && c.clearFinder()); }
 
 // ───────────── 공용 도우미 ─────────────
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -248,6 +257,7 @@ function renderTask(modId, lvlId, taskId) {
     return null;
   }
   const otherActive = !!active;
+  const content = contentFor(modId, taskId);
   view.innerHTML = `
     <div class="session-layout">
       <div class="panel session-head span-all">
@@ -258,11 +268,11 @@ function renderTask(modId, lvlId, taskId) {
           <span class="tag">${esc(t.unit.label)}</span>
         </div>
       </div>
-      <div class="panel placeholder span-all">
+      ${content ? `<div class="panel span-all"><h3 class="panel-title">세션 설정</h3>${content.settingsHtml(lvlId)}</div>` : `<div class="panel placeholder span-all">
         ${t.reference
           ? `<b>참고 기능</b><br>Chord Dictionary는 연습 세션이 아니라 참고 기능이라 기록하지 않음. 사전 화면은 ${m.stage}단계에서 구현 예정임`
-          : `<b>학습 콘텐츠 준비 중</b><br>이 과제의 실제 연습 화면은 개발 ${m.stage}단계에서 구현됨. 지금(1단계)은 세션 시작·일시정지·종료와 기록·학습일지를 검증할 수 있음`}
-      </div>
+          : `<b>학습 콘텐츠 준비 중</b><br>이 과제의 실제 연습 화면은 개발 ${m.stage}단계에서 구현됨. 지금은 세션 시작·일시정지·종료와 기록·학습일지만 사용할 수 있음`}
+      </div>`}
       ${t.reference ? "" : `
       <div class="span-all">
         ${otherActive ? `<div class="autopause" style="margin-bottom:10px">다른 세션이 진행 중임: ${esc(moduleName(active.module))} · ${esc(taskName(active.module, active.level, active.task))}</div>` : ""}
@@ -270,8 +280,10 @@ function renderTask(modId, lvlId, taskId) {
         <p class="muted small" style="text-align:center;margin:8px 0 0">시작 버튼을 눌러야 시간 측정이 시작됨</p>
       </div>`}
     </div>`;
+  if (content) content.bindSettings(view);
   const btn = $("#startBtn");
   if (btn) btn.onclick = async () => {
+    const options = content ? content.readSettings(view) : {};
     if (S.getActive()) {
       const cur = S.getActive();
       const k = await ask("진행 중인 세션이 있음", `<p>${esc(moduleName(cur.module))} · ${esc(taskName(cur.module, cur.level, cur.task))} 세션이 아직 종료되지 않았음. 한 번에 하나의 세션만 진행할 수 있음</p>`, [
@@ -284,7 +296,8 @@ function renderTask(modId, lvlId, taskId) {
       metroStop();
       await S.endSession();
     }
-    S.startSession({ module: modId, level: lvlId, task: taskId, type: t.type });
+    clearContent();
+    S.startSession({ module: modId, level: lvlId, task: taskId, type: t.type, options });
     holdScreen(true);
     go("session", { replace: true });
   };
@@ -298,14 +311,47 @@ function renderSession() {
   const m = findModule(s0.module);
   const t = findTask(s0.module, s0.level, s0.task);
   const unitLabel = t ? t.unit.label : "";
-  view.innerHTML = `
-    <div class="session-layout">
+  const content = contentFor(s0.module, s0.task);
+  const unitsPanel = `
+        <div class="panel">
+          <div class="units">
+            <div><div class="lbl">완료 횟수</div><div class="count" id="unitCount">0</div></div>
+            <div class="lbl" style="text-align:right">${esc(unitLabel)}<br>${content ? "자동 판정 · " : ""}연습시간과 별도로 집계</div>
+          </div>
+        </div>`;
+  const metroPanel = `
+        <div class="panel" id="metroPanel">
+          <div class="metro-top"><h3>METRONOME</h3><button class="switch" id="metroSwitch" type="button">OFF</button></div>
+          <div class="bpm-row">
+            <button type="button" data-bpm="-5">−5</button><button type="button" data-bpm="-1">−1</button>
+            <div class="bpm-val"><b id="bpmVal">${metro.bpm}</b><span>BPM</span></div>
+            <button type="button" data-bpm="1">+1</button><button type="button" data-bpm="5">+5</button>
+          </div>
+          <div class="beats" id="beatDots"></div>
+          <div class="metro-opts">박자
+            <div class="seg" id="beatSeg">${[2, 3, 4, 6].map(n => `<button type="button" data-beats="${n}" class="${n === metro.beats ? "sel" : ""}">${n}/4</button>`).join("")}</div>
+          </div>
+        </div>`;
+  const head = `
       <div class="panel session-head span-all">
         <div class="crumbs">${esc(moduleName(s0.module))} · ${esc(levelName(s0.module, s0.level))}</div>
         <h1>${esc(taskName(s0.module, s0.level, s0.task))}</h1>
         <span class="tag accent">${esc(SESSION_TYPES[s0.type] || s0.type)}</span>
       </div>
-      <div class="autopause span-all hidden" id="autoNote">앱을 벗어나 자동으로 일시정지됐음. 벗어나 있던 시간은 연습시간에 포함되지 않음. 재개를 누르면 이어서 측정함</div>
+      <div class="autopause span-all hidden" id="autoNote">앱을 벗어나 자동으로 일시정지됐음. 벗어나 있던 시간은 연습시간에 포함되지 않음. 재개를 누르면 이어서 측정함</div>`;
+  view.innerHTML = content ? `
+    <div class="session-layout content-layout">
+      ${head}
+      <div class="panel status-bar span-all">
+        <div class="status-time"><div class="state-label" id="stateLabel">RUNNING</div><div class="mid-time" id="bigTime">00:00</div></div>
+        <button class="btn warn" id="pauseBtn" type="button">일시정지</button>
+        <button class="btn danger" id="endBtn" type="button">종료</button>
+      </div>
+      <div class="panel content-panel" id="contentArea"></div>
+      <div style="display:grid;gap:12px;align-content:start">${unitsPanel}</div>
+    </div>` : `
+    <div class="session-layout">
+      ${head}
       <div>
         <div class="panel clock-panel">
           <div class="state-label" id="stateLabel">RUNNING</div>
@@ -318,33 +364,28 @@ function renderSession() {
         </div>
       </div>
       <div style="display:grid;gap:12px">
-        <div class="panel">
-          <div class="units">
-            <div><div class="lbl">완료 횟수</div><div class="count" id="unitCount">0</div></div>
-            <div class="lbl" style="text-align:right">${esc(unitLabel)}<br>연습시간과 별도로 집계</div>
-          </div>
-        </div>
-        <div class="panel" id="metroPanel">
-          <div class="metro-top"><h3>METRONOME</h3><button class="switch" id="metroSwitch" type="button">OFF</button></div>
-          <div class="bpm-row">
-            <button type="button" data-bpm="-5">−5</button><button type="button" data-bpm="-1">−1</button>
-            <div class="bpm-val"><b id="bpmVal">${metro.bpm}</b><span>BPM</span></div>
-            <button type="button" data-bpm="1">+1</button><button type="button" data-bpm="5">+5</button>
-          </div>
-          <div class="beats" id="beatDots"></div>
-          <div class="metro-opts">박자
-            <div class="seg" id="beatSeg">${[2, 3, 4, 6].map(n => `<button type="button" data-beats="${n}" class="${n === metro.beats ? "sel" : ""}">${n}/4</button>`).join("")}</div>
-          </div>
-        </div>
+        ${unitsPanel}
+        ${metroPanel}
         <div class="panel placeholder">
           <b>학습 콘텐츠는 ${m ? m.stage : "-"}단계에서 구현 예정</b><br>
-          1단계에서는 아래 시험용 버튼으로 완료 기록을 확인할 수 있음. 실제 과제가 붙으면 이 버튼은 자동 판정으로 바뀜
+          지금은 아래 시험용 버튼으로 완료 기록을 확인할 수 있음. 실제 과제가 붙으면 이 버튼은 자동 판정으로 바뀜
           <div style="margin-top:10px"><button class="btn small" id="unitBtn" type="button">완료 1회 기록 (시험용)</button></div>
         </div>
       </div>
     </div>`;
 
+  if (content) {
+    onCleanup(content.mount($("#contentArea"), {
+      getActive: S.getActive,
+      elapsedMs: S.elapsedMs,
+      addUnit: n => S.addCompletedUnit(n),
+      toast
+    }));
+  }
+
+  const hasMetro = !!$("#metroPanel");
   const drawDots = () => {
+    if (!hasMetro) return;
     $("#beatDots").innerHTML = Array.from({ length: metro.beats }, (_, i) => `<span class="beat ${i === 0 ? "accent" : ""}" data-i="${i}"></span>`).join("");
   };
   drawDots();
@@ -365,6 +406,7 @@ function renderSession() {
     $("#pauseBtn").className = "btn " + (running ? "warn" : "primary");
     $("#unitCount").textContent = s.completedUnits;
     $("#autoNote").classList.toggle("hidden", !S.peekAutoPauseNotice());
+    if (!hasMetro) return;
     const sw = $("#metroSwitch");
     sw.textContent = metro.on ? "ON" : "OFF";
     sw.classList.toggle("on", metro.on);
@@ -390,7 +432,7 @@ function renderSession() {
       paint();
     }
   };
-  $("#unitBtn").onclick = () => { S.addCompletedUnit(1); toast("완료 1회 기록함"); };
+  if ($("#unitBtn")) $("#unitBtn").onclick = () => { S.addCompletedUnit(1); toast("완료 1회 기록함"); };
   $("#endBtn").onclick = async () => {
     const s = S.getActive();
     const sec = S.elapsedSec();
@@ -403,6 +445,7 @@ function renderSession() {
       metroStop(); holdScreen(false);
       try {
         const rec = await S.endSession();
+        clearContent();
         Store.requestPersistence();
         go(`done/${rec.id}`, { replace: true });
       } catch (e) {
@@ -416,11 +459,12 @@ function renderSession() {
         const back = `m/${s.module}/${s.level}`;
         metroStop(); holdScreen(false);
         S.discardSession();
+        clearContent();
         go(back, { replace: true });
       }
     }
   };
-  $("#metroSwitch").onclick = async () => {
+  if (hasMetro) $("#metroSwitch").onclick = async () => {
     if (metro.on) metroStop();
     else {
       if (S.getActive().status !== "running") { toast("세션을 재개한 뒤 메트로놈을 켤 수 있음"); return; }
@@ -428,7 +472,7 @@ function renderSession() {
     }
     paint();
   };
-  $("#metroPanel").addEventListener("click", e => {
+  if (hasMetro) $("#metroPanel").addEventListener("click", e => {
     const b = e.target.closest("[data-bpm]");
     if (b) {
       metro.bpm = Math.max(30, Math.min(300, metro.bpm + Number(b.dataset.bpm)));
@@ -639,6 +683,7 @@ function logItem(r) {
         <dt>실제 연습</dt><dd>${formatDuration(r.activeSec)} (${r.activeSec}초)</dd>
         <dt>일시정지</dt><dd>${r.pauses.length}회 · ${formatDuration(pauseSec)}${r.pauses.length ? `<br><span class="muted small">${r.pauses.map(p => `${hm(p.from)}~${hm(p.to)} ${reasons[p.reason] || p.reason}`).join(", ")}</span>` : ""}</dd>
         <dt>완료 횟수</dt><dd>${r.completedUnits}회</dd>
+        ${r.options && r.options.timeLimit ? `<dt>설정</dt><dd>제한시간 ${r.options.timeLimit}초</dd>` : ""}
       </dl>
       <div style="margin-top:12px"><button class="btn small danger" type="button" data-del="${esc(r.id)}">이 기록 삭제</button></div>
     </div>

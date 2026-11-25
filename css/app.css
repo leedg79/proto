@@ -131,6 +131,7 @@ h1, h2, h3 { margin: 0; line-height: 1.25; }
 
 /* ── 버튼 ── */
 .btn {
+  white-space: nowrap;
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
   min-height: 48px; padding: 0 18px; border-radius: 14px; border: 1px solid var(--line);
   background: var(--panel2); font-weight: 700; font-size: 15.5px;
@@ -147,7 +148,8 @@ h1, h2, h3 { margin: 0; line-height: 1.25; }
 .btn-row .btn { flex: 1; }
 
 /* ── 세션 화면 ── */
-.session-layout { display: grid; gap: 14px; }
+.session-layout { display: grid; gap: 14px; grid-template-columns: minmax(0, 1fr); }
+.session-layout > * { min-width: 0; }
 .panel { padding: 16px; border-radius: 18px; border: 1px solid var(--line); background: var(--panel); }
 .session-head .crumbs { color: var(--muted); font-size: 13.5px; }
 .session-head h1 { font-size: 24px; margin: 4px 0 8px; }
@@ -310,7 +312,7 @@ h1, h2, h3 { margin: 0; line-height: 1.25; }
   .module-card { min-height: 104px; padding: 12px; }
   .module-card strong { font-size: 17px; }
   .module-card.wide { grid-column: auto; min-height: 104px; }
-  .session-layout { grid-template-columns: 1.1fr 1fr; align-items: start; }
+  .session-layout { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); align-items: start; }
   .session-layout .span-all { grid-column: 1 / -1; }
   .clock-panel { padding: 12px; }
   .big-time { font-size: 56px; }
@@ -320,6 +322,59 @@ h1, h2, h3 { margin: 0; line-height: 1.25; }
 @media (min-width: 900px) {
   .module-grid { grid-template-columns: repeat(5, 1fr); }
   .module-card.wide { grid-column: auto; }
-  .session-layout { grid-template-columns: 1.1fr 1fr; align-items: start; }
+  .session-layout { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); align-items: start; }
   .session-layout .span-all { grid-column: 1 / -1; }
+}
+
+/* ── 세션 설정 ── */
+.panel-title { font-size: 13px; font-family: var(--mono); letter-spacing: .14em; color: var(--muted); font-weight: 600; margin-bottom: 12px; }
+.field label { display: flex; justify-content: space-between; align-items: baseline; font-size: 14.5px; color: var(--muted); margin-bottom: 8px; }
+.field label b { color: var(--text); font-family: var(--mono); font-size: 18px; font-weight: 500; }
+.field input[type=range] { width: 100%; accent-color: var(--accent); height: 32px; }
+.range-ends { display: flex; justify-content: space-between; font-size: 11.5px; color: var(--faint); font-family: var(--mono); }
+
+/* ── 콘텐츠가 있는 세션 화면 ── */
+.status-bar { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: center; padding: 10px 12px; }
+.status-bar .btn { min-height: 46px; padding: 0 16px; }
+.status-time { display: flex; align-items: baseline; gap: 10px; }
+.mid-time { font-family: var(--mono); font-size: 26px; font-variant-numeric: tabular-nums; }
+.content-panel { padding: 14px; }
+
+/* Note Finder */
+.nf-meta { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 11.5px; letter-spacing: .1em; color: var(--muted); margin-bottom: 8px; }
+.prompt-card { border: 1px solid #3b4b5e; background: linear-gradient(145deg, #1d2a3b, #151d29); border-radius: 17px; padding: 24px 18px; text-align: center; transition: opacity .2s; }
+.prompt-card.paused { opacity: .45; }
+.prompt-caption { font-family: var(--mono); font-size: 11px; letter-spacing: .16em; color: var(--accent); }
+.prompt-main { font-size: clamp(56px, 17vw, 84px); font-weight: 800; letter-spacing: -.03em; line-height: 1.05; margin: 8px 0 6px; }
+.prompt-sub { color: var(--muted); font-family: var(--mono); font-size: 13.5px; letter-spacing: .06em; }
+.cycle-dots { display: flex; justify-content: center; gap: 6px; margin: 12px 0 4px; }
+.cycle-dots i { width: 8px; height: 8px; border-radius: 50%; background: #ffffff14; border: 1px solid var(--line); }
+.cycle-dots i.on { background: var(--accent); border-color: var(--accent); }
+.timer-wrap { display: flex; align-items: center; gap: 12px; margin: 10px 0 12px; }
+.timer-track { height: 6px; background: #2a3546; border-radius: 10px; flex: 1; overflow: hidden; }
+.timer-track div { height: 100%; width: 100%; background: var(--accent); }
+.timer-text { font-family: var(--mono); font-size: 15px; min-width: 38px; text-align: right; font-variant-numeric: tabular-nums; }
+.nf-actions .btn { min-height: 54px; font-size: 17px; }
+.answer-area { background: #0f151f; border: 1px solid var(--line); border-radius: 14px; padding: 12px; margin-top: 12px; }
+.answer-title { font-weight: 700; margin-bottom: 8px; display: flex; gap: 8px; align-items: center; }
+.fretboard { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.fretboard svg { display: block; width: 100%; height: auto; }
+.answer-note { color: var(--muted); font-size: 13px; margin-top: 8px; }
+.inline-time { margin-top: 16px; padding-top: 12px; border-top: 1px solid #ffffff0d; }
+.nf-foot { margin: 8px 0 0; }
+@media (orientation: landscape) and (max-height: 560px) {
+  .content-layout { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 10px; }
+  .content-layout .session-head { padding: 8px 14px; display: flex; align-items: center; gap: 10px; }
+  .content-layout .session-head h1 { font-size: 18px; margin: 0; }
+  .content-layout .session-head .crumbs { order: 2; }
+  .content-layout .status-bar .btn { padding: 0 12px; min-height: 42px; font-size: 14.5px; }
+  .content-layout .mid-time { font-size: 22px; }
+  .content-layout .status-bar { grid-column: 2; grid-row: 2; }
+  .content-layout .content-panel { grid-column: 1; grid-row: 2 / span 3; }
+  .prompt-card { padding: 14px; }
+  .prompt-main { font-size: 52px; }
+}
+@media (min-width: 900px) {
+  .content-layout { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); }
+  .content-layout .content-panel { grid-row: span 2; }
 }

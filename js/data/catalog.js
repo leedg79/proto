@@ -11,6 +11,7 @@ export const UNIT = {
   noteCycle: { kind: "cycle", size: 12, label: "12개 음 1순환 = 1회" },
   ear24: { kind: "count", size: 24, label: "24문제 = 1회" },
   blocks5: { kind: "blocks", size: 5, label: "5개 블록 1사이클 = 1회" },
+  positions7: { kind: "positions", size: 7, label: "7개 포지션 1사이클 = 1회" },
   mission: { kind: "mission", size: 1, label: "과제 미션 완료 = 1회" },
   none: { kind: "none", size: 0, label: "참고 기능(세션 기록 없음)" }
 };
@@ -41,6 +42,16 @@ const SCALE_TASKS = [
   { id: "block-root", name: "Block + Root Memorization", type: "block", unit: UNIT.mission }
 ];
 
+// S4 Modes는 블록 대신 시작음 기준 7개 포지션 단위
+const MODE_TASKS = [
+  { id: "interval-finding", name: "Scale Interval Finding", type: "finding", unit: UNIT.mission },
+  { id: "block-learning", name: "Position Scale Learning", type: "block", unit: UNIT.positions7 },
+  { id: "block-transition", name: "Position Transition Practice", type: "block", unit: UNIT.positions7 },
+  { id: "block-root", name: "Position + Root Memorization", type: "block", unit: UNIT.mission }
+];
+
+const PLAY_TASKS = CHORD_TASKS.filter(t => t.id === "play-session" || t.id === "chord-dictionary");
+
 export const MODULES = [
   {
     id: "notes",
@@ -50,11 +61,11 @@ export const MODULES = [
     levels: [
       {
         id: "n1", name: "N1 무작위 3~4현", desc: "지정된 현에서 음 위치 찾기",
-        tasks: [{ id: "note-finder", name: "Note Finder", type: "finding", unit: UNIT.noteCycle }]
+        tasks: [{ id: "note-finder", name: "Note Finder", type: "finding", unit: UNIT.noteCycle, implemented: true }]
       },
       {
         id: "n2", name: "N2 전체 6현", desc: "6현 전체(0~15프렛) 음 위치 찾기",
-        tasks: [{ id: "note-finder", name: "Note Finder", type: "finding", unit: UNIT.noteCycle }]
+        tasks: [{ id: "note-finder", name: "Note Finder", type: "finding", unit: UNIT.noteCycle, implemented: true }]
       }
     ]
   },
@@ -67,7 +78,8 @@ export const MODULES = [
       { id: "c1", name: "C1 초급", desc: "오픈 코드, 메이저·마이너 트라이어드, 파워 코드", tasks: CHORD_TASKS },
       { id: "c2", name: "C2 중급", desc: "바레·이동형 코드, 디미니시드·어그먼티드·서스펜디드, 트라이어드 전위, 현 그룹별 트라이어드·트라이어드 매핑, CAGED, 7th 코드", tasks: CHORD_TASKS },
       { id: "c3", name: "C3 상급", desc: "7th 코드 전위, Shell Voicing, Drop 2·Drop 3, 9th·11th·13th 텐션", tasks: CHORD_TASKS },
-      { id: "c4", name: "C4 고급", desc: "대리 코드, 슬래시 코드, 보이스 리딩, Open·Quartal Voicing, 장르별 컴핑, 코드 멜로디", tasks: CHORD_TASKS }
+      { id: "c4", name: "C4 고급", desc: "대리 코드, 슬래시 코드, Open·Quartal Voicing", tasks: CHORD_TASKS },
+      { id: "c5", name: "C5 응용", desc: "보이스 리딩, 장르별 컴핑, 코드 멜로디", tasks: PLAY_TASKS }
     ]
   },
   {
@@ -107,7 +119,7 @@ export const MODULES = [
       { id: "s1", name: "S1 Chord Tones", desc: "코드톤과 스케일의 관계", tasks: SCALE_TASKS },
       { id: "s2", name: "S2 Pentatonic & Blues", desc: "메이저·마이너 펜타토닉, 블루스 스케일", tasks: SCALE_TASKS },
       { id: "s3", name: "S3 Major & Minor Family", desc: "메이저, 내추럴·하모닉·멜로딕 마이너", tasks: SCALE_TASKS },
-      { id: "s4", name: "S4 Modes", desc: "7개 모드", tasks: SCALE_TASKS },
+      { id: "s4", name: "S4 Modes", desc: "7개 모드, 시작음 기준 7개 포지션", tasks: MODE_TASKS },
       { id: "s5", name: "S5 Chord-Scale Application", desc: "코드 진행 위 스케일 적용(반주와 함께 수행)", tasks: SCALE_TASKS }
     ]
   },
