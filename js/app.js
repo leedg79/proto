@@ -8,15 +8,17 @@ import * as B from "./core/backup.js";
 import * as Metro from "./audio/metronome.js";
 import * as NoteFinder from "./modules/notes/finder-view.js";
 import * as RandomChord from "./modules/chords/random-view.js";
+import * as BpmChord from "./modules/chords/bpm-view.js";
 import { renderDictionary } from "./modules/chords/dictionary-view.js";
 
-const APP_VERSION = "1.3.1";
+const APP_VERSION = "1.4.0";
 
 // 구현된 과제의 연습 화면 (모듈/과제 → 화면 모듈)
 // 화면 모듈: settingsHtml, bindSettings, readSettings, mount, clearFinder
 const CONTENT = {
   "notes/note-finder": NoteFinder,
-  "chords/random-chord": RandomChord
+  "chords/random-chord": RandomChord,
+  "chords/bpm-chord": BpmChord
 };
 const contentFor = (mod, task) => CONTENT[`${mod}/${task}`] || null;
 function clearContent() { Object.values(CONTENT).forEach(c => c.clearFinder && c.clearFinder()); }
@@ -725,6 +727,7 @@ function logItem(r) {
         <dt>일시정지</dt><dd>${r.pauses.length}회 · ${formatDuration(pauseSec)}${r.pauses.length ? `<br><span class="muted small">${r.pauses.map(p => `${hm(p.from)}~${hm(p.to)} ${reasons[p.reason] || p.reason}`).join(", ")}</span>` : ""}</dd>
         <dt>완료 횟수</dt><dd>${r.completedUnits}회</dd>
         ${r.options && r.options.timeLimit ? `<dt>설정</dt><dd>제한시간 ${r.options.timeLimit}초</dd>` : ""}
+        ${r.options && r.options.bpm ? `<dt>설정</dt><dd>시작 BPM ${r.options.bpm}</dd>` : ""}
       </dl>
       <div style="margin-top:12px"><button class="btn small danger" type="button" data-del="${esc(r.id)}">이 기록 삭제</button></div>
     </div>

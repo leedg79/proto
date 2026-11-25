@@ -178,3 +178,39 @@ test("사용 빈도 순위: 최대 8개, 중복 운지 없음, 오픈 코드·�
   const f = V.rankVoicings(V.closeTriads(5, "maj"));
   assert.ok(f.every(v => Math.max(...v.notes.map(n => n.f)) <= 12));
 });
+
+import * as BPM from "../js/modules/chords/bpm-core.js";
+
+test("BPM Chord Finding: 카운트인 4박 → 2박마다 코드, 16개 = 완료 1회", () => {
+  let st = BPM.init({ topics: ["triad"], bpm: 90 }, seeded(3));
+  assert.equal(st.seq.length, 16);
+  assert.equal(BPM.beatInfo(0, 0).phase, "count");
+  assert.equal(BPM.beatInfo(0, 3).countLeft, 1);
+  let units = 0, changes = 0;
+  // 카운트인 4박 + 32박(8마디) + 다음 묶음 첫 박
+  for (let b = 0; b < 4 + 32 + 2; b++) {
+    const info = BPM.beatInfo(0, b);
+    if (info.phase === "chord" && info.chordStart) changes++;
+    const r = BPM.advance(st, info, seeded(b));
+    st = r.state; if (r.completedUnit) units++;
+  }
+  assert.equal(changes, 17);
+  assert.equal(units, 1);
+  assert.equal(st.passes, 1);
+  assert.equal(st.pos, 0);
+  assert.equal(BPM.barOf(15), 8);
+});
+
+test("BPM Chord Finding: 중간에서 재개하면 그 코드부터, 완료는 16번째 다음에만", () => {
+  let st = BPM.init({ topics: ["power"], bpm: 60 }, seeded(5));
+  st = { ...st, pos: 10 };
+  let units = 0;
+  for (let b = 0; b < 4 + 12; b++) { // 코드 10~15
+    const r = BPM.advance(st, BPM.beatInfo(10, b)); st = r.state; if (r.completedUnit) units++;
+  }
+  assert.equal(st.pos, 15);
+  assert.equal(units, 0);
+  const r = BPM.advance(st, BPM.beatInfo(10, 16));
+  assert.equal(r.completedUnit, true);
+  assert.equal(BPM.clampBpm(300), 160);
+});

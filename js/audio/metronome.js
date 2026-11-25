@@ -19,7 +19,7 @@ function ensure(ctx) {
   sched = new BeatScheduler(ctx);
   sched.onBeat = (time, beat, inBar) => {
     click(ctx, time, inBar === 0);
-    visualQueue.push({ time, inBar });
+    visualQueue.push({ time, inBar, beat });
   };
 }
 
@@ -43,7 +43,7 @@ function drawLoop() {
     const nowT = ctx.currentTime;
     while (visualQueue.length && visualQueue[0].time <= nowT) {
       const v = visualQueue.shift();
-      if (onVisual) onVisual(v.inBar);
+      if (onVisual) onVisual(v.inBar, v.beat);
     }
   }
   raf = requestAnimationFrame(drawLoop);

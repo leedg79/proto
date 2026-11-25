@@ -409,3 +409,19 @@ h1, h2, h3 { margin: 0; line-height: 1.25; }
 .type-grid button span { font-size: 10.5px; }
 .dict-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px; }
 .dict-head h2 { font-size: 26px; }
+
+/* ── BPM Chord Finding ── */
+.check-row { display: flex; align-items: center; gap: 10px; font-size: 14.5px; color: var(--muted); margin-top: 10px; min-height: 36px; }
+.check-row input { width: 20px; height: 20px; accent-color: var(--accent); }
+.bf-beats { margin-top: 12px; }
+.prompt-card.count { border-color: #ffcf5c88; }
+.prompt-card.count .prompt-caption { color: var(--warn); }
+.bf-next { display: flex; align-items: baseline; gap: 8px; justify-content: center; margin-top: 10px; font-size: 18px; }
+.bf-next b { font-size: 22px; }
+.bf-dots i { width: 7px; height: 7px; }
+.bf-dots { gap: 4px; flex-wrap: wrap; }
+.bf-diagram { display: flex; justify-content: center; margin: 12px 0 4px; }
+.bf-cell { width: 150px; }
+.bf-controls { margin-top: 12px; padding-top: 8px; border-top: 1px solid #ffffff0d; }
+.bf-controls .bpm-row { margin: 8px 0 4px; }
+.bf-controls .bpm-row button { width: 46px; height: 44px; border-radius: 12px; border: 1px solid var(--line); background: var(--panel2); font-family: var(--mono); font-size: 14px; }
