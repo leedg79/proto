@@ -16,6 +16,7 @@
   --m-scales: #c9a0ff;
   --m-ear: #6be3e0;
   --m-licks: #ff8fb8;
+  --m-technique: #ffe36b;
   --sans: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", "Segoe UI", Roboto, sans-serif;
   --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
   --safe-top: env(safe-area-inset-top, 0px);
@@ -593,3 +594,25 @@ h1, h2, h3 { margin: 0; line-height: 1.25; }
 .live-settings summary::-webkit-details-marker { display: none; }
 .live-settings summary::before { content: "⚙"; margin-right: 6px; }
 .live-settings[open] summary { margin-bottom: 4px; }
+
+/* Technique */
+.tq-bpm { display: flex; align-items: baseline; justify-content: space-between; margin: 10px 0 4px; }
+.tq-bpm b { font-size: 40px; font-family: var(--mono, monospace); }
+.tq-bpm span { margin-left: 6px; color: #8a96a8; font-size: 12px; }
+.tq-mic { display: grid; grid-template-columns: 1fr 70px auto; gap: 8px; align-items: center; margin: 6px 0; }
+.tq-meter { height: 8px; background: #1b2431; border-radius: 4px; overflow: hidden; }
+.tq-meter i { display: block; height: 100%; width: 0; background: #a6f06a; transition: width .08s; }
+.tq-result { background: #121a25; border: 1px solid #263244; border-radius: 12px; padding: 12px; margin-top: 10px; }
+.tq-verdict { font-size: 22px; font-weight: 900; }
+.tq-verdict.ok { color: #a6f06a; } .tq-verdict.ng { color: #ff9a6a; }
+.tq-verdict small { font-size: 13px; color: #8a96a8; margin-left: 6px; }
+.tq-stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-top: 8px; }
+.tq-stats div { background: #0f151e; border-radius: 8px; padding: 8px; }
+.tq-stats b { display: block; font-size: 18px; }
+.tq-stats small { color: #8a96a8; font-size: 11px; }
+.score-wrap .j-good, .score-wrap .j-good path, .score-wrap .j-good text { fill: #1f9d4c !important; stroke: #1f9d4c; }
+.score-wrap .j-ok, .score-wrap .j-ok path, .score-wrap .j-ok text { fill: #c99a00 !important; stroke: #c99a00; }
+.score-wrap .j-off, .score-wrap .j-off path, .score-wrap .j-off text { fill: #e06a1f !important; stroke: #e06a1f; }
+.score-wrap .j-miss, .score-wrap .j-miss path, .score-wrap .j-miss text { fill: #d22 !important; stroke: #d22; }
+.j-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin: 0 2px 0 6px; }
+.j-dot.good { background: #1f9d4c; } .j-dot.ok { background: #c99a00; } .j-dot.off { background: #e06a1f; } .j-dot.miss { background: #d22; }

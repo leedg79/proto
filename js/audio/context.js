@@ -3,6 +3,12 @@
 // 시작·재생 버튼 처리 안에서 unlockAudio()를 먼저 호출해야 함
 
 let ctx = null;
+let recordMode = false;   // 마이크 사용 중이면 오디오 세션을 play-and-record로 둠
+
+export function setRecordMode(on) {
+  recordMode = !!on;
+  try { if (navigator.audioSession) navigator.audioSession.type = recordMode ? "play-and-record" : "playback"; } catch (_) {}
+}
 
 export function getAudioContext() {
   return ctx;
@@ -16,9 +22,8 @@ export async function unlockAudio() {
   }
   // 최신 Safari: 무음 스위치가 켜져 있어도 재생되도록 요청 (지원 시에만 적용)
   try {
-    if (navigator.audioSession && navigator.audioSession.type !== "playback") {
-      navigator.audioSession.type = "playback";
-    }
+    const want = recordMode ? "play-and-record" : "playback";
+    if (navigator.audioSession && navigator.audioSession.type !== want) navigator.audioSession.type = want;
   } catch (_) {}
   if (ctx.state !== "running") {
     try { await ctx.resume(); } catch (_) {}

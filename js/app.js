@@ -28,12 +28,13 @@ import { loadMyLicks, mergeMyLicks } from "./modules/licks/my-licks.js";
 import { getFlags as getLickFlags } from "./modules/licks/lick-flags.js";
 import { renderJam } from "./modules/jam/jam-view.js";
 import { makePatternTask } from "./modules/rhythm/pattern-view.js";
+import { makeTechTask } from "./modules/technique/tech-view.js";
 import * as RhythmReading from "./modules/rhythm/reading-view.js";
 import * as RhythmPhrase from "./modules/rhythm/phrase-view.js";
 import { strum, loadInstrument } from "./audio/sampler.js";
 import { unlockAudio } from "./audio/context.js";
 
-const APP_VERSION = "2.4.0";
+const APP_VERSION = "2.5.0";
 
 // 구현된 과제의 연습 화면 (모듈/과제 → 화면 모듈)
 // 화면 모듈: settingsHtml, bindSettings, readSettings, mount, clearFinder
@@ -62,8 +63,10 @@ const CONTENT = {
   "rhythm/phrase": RhythmPhrase
 };
 // 과제에 pending이 있으면(예: Scales 코드 전환하며 익히기) 아직 연습 화면 없음
-const contentFor = (mod, task, level) => { const t = findTask(mod, level, task); return t && t.pending ? null : CONTENT[`${mod}/${task}`] || null; };
-function clearContent() { Object.values(CONTENT).forEach(c => c.clearFinder && c.clearFinder()); }
+const TECH_TASKS = Object.fromEntries(["t1", "t2", "t3", "t4", "t5"].map(l => [l, makeTechTask(l)]));
+const contentFor = (mod, task, level) => {
+  if (mod === "technique" && task === "drill") return TECH_TASKS[level] || null; const t = findTask(mod, level, task); return t && t.pending ? null : CONTENT[`${mod}/${task}`] || null; };
+function clearContent() { [...Object.values(CONTENT), ...Object.values(TECH_TASKS)].forEach(c => c.clearFinder && c.clearFinder()); }
 
 // ───────────── 공용 도우미 ─────────────
 const $ = (sel, root = document) => root.querySelector(sel);

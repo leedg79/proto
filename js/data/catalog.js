@@ -23,6 +23,7 @@ export const UNIT = {
   licks10: { kind: "count", size: 10, label: "릭 10개 = 1회" },
   pattern8: { kind: "mission", size: 1, label: "패턴 1개를 8마디(같이·혼자 치기) = 1회" },
   reading10: { kind: "count", size: 10, label: "10문제 = 1회" },
+  tech3: { kind: "mission", size: 3, label: "박자 판정 통과 3회 = 1회" },
   phrase8: { kind: "mission", size: 1, label: "프레이즈 1개를 8마디(같이·혼자 치기) = 1회" }
 };
 
@@ -37,7 +38,8 @@ export const SESSION_TYPES = {
   ear: "청음",
   transcribe: "채보",
   reference: "사전",
-  lick: "릭 연습"
+  lick: "릭 연습",
+  technique: "테크닉"
 };
 
 const CHORD_TASKS = [
@@ -180,6 +182,19 @@ export const MODULES = [
     levels: LICK_LEVELS.map(l => ({ id: l.id, name: l.name, desc: l.desc, tasks: l.id === "l7" ? MY_LICK_TASKS : LICK_TASKS }))
   },
   {
+    id: "technique",
+    name: "Technique",
+    sub: "왼손 · 벤딩 · 피킹 · 뮤팅 · 템포 사다리",
+    stage: 6,
+    levels: [
+      { id: "t1", name: "T1 Fretting Hand", desc: "크로매틱, 스파이더, 손가락 독립, 넓혀 짚기, 자리 옮기기", tasks: [{ id: "drill", name: "템포 사다리 · Tempo Ladder", type: "technique", unit: UNIT.tech3 }] },
+      { id: "t2", name: "T2 Bending · Vibrato", desc: "반음·온음 벤딩, 벤딩 섞기, 비브라토", tasks: [{ id: "drill", name: "템포 사다리 · Tempo Ladder", type: "technique", unit: UNIT.tech3 }] },
+      { id: "t3", name: "T3 Picking", desc: "얼터네이트, 줄 넘기, 스트링 스킵, 이코노미, 트레몰로, 코드톤·스케일 피킹", tasks: [{ id: "drill", name: "템포 사다리 · Tempo Ladder", type: "technique", unit: UNIT.tech3 }] },
+      { id: "t4", name: "T4 Muting · Expression", desc: "팜뮤트, 스타카토, 해머·풀 레가토, 슬라이드", tasks: [{ id: "drill", name: "템포 사다리 · Tempo Ladder", type: "technique", unit: UNIT.tech3 }] },
+      { id: "t5", name: "T5 Applied Etudes", desc: "벤딩·리프·시퀀스·레가토·스트링 스킵을 섞은 응용 연습곡", tasks: [{ id: "drill", name: "템포 사다리 · Tempo Ladder", type: "technique", unit: UNIT.tech3 }] }
+    ]
+  },
+  {
     id: "ear",
     name: "Ear Lab",
     sub: "음 이름 · 음정 · 채보",
@@ -255,6 +270,11 @@ const tp = list => list.map(([id, name]) => ({ id, name }));
 const MODE_LIST = [["ionian", "Ionian"], ["dorian", "Dorian"], ["phrygian", "Phrygian"], ["lydian", "Lydian"], ["mixolydian", "Mixolydian"], ["aeolian", "Aeolian"], ["locrian", "Locrian"]];
 
 const LEVEL_TOPICS = {
+  "technique/t1": tp([["chromatic", "크로매틱"], ["spider", "스파이더"], ["independence", "손가락 독립"], ["stretch", "넓혀 짚기"], ["shift", "자리 옮기기"]]),
+  "technique/t2": tp([["half-bend", "반음 벤딩"], ["whole-bend", "온음 벤딩"], ["release", "벤딩 섞기"], ["vibrato", "비브라토"]]),
+  "technique/t3": tp([["alternate", "얼터네이트"], ["crossing", "줄 넘기"], ["skipping", "스트링 스킵"], ["economy", "이코노미"], ["tremolo", "트레몰로"], ["chord-tone", "코드톤 피킹"], ["scale", "스케일 피킹"]]),
+  "technique/t4": tp([["palm-mute", "팜뮤트"], ["staccato", "스타카토"], ["legato", "레가토(해머·풀)"], ["slide", "슬라이드"]]),
+  "technique/t5": tp([["etude", "응용 연습곡"]]),
   "chords/c1": tp([["open", "오픈 코드"], ["triad", "메이저·마이너 트라이어드"], ["power", "파워 코드"]]),
   "chords/c2": tp([["barre", "바레·이동형 코드"], ["dim-aug-sus", "디미니시드·어그먼티드·서스펜디드"], ["triad-inversion", "트라이어드 전위"], ["string-set-triad", "현 그룹별 트라이어드"], ["caged", "CAGED"], ["seventh", "7th 코드"]]),
   "chords/c3": tp([["seventh-inversion", "7th 코드 전위"], ["shell", "Shell Voicing"], ["drop2", "Drop 2"], ["drop3", "Drop 3"], ["tension", "텐션(9·11·13)"]]),
