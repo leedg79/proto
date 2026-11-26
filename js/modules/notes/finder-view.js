@@ -66,9 +66,11 @@ export function mount(container, api) {
         <div class="timer-track"><div id="nfBar"></div></div>
         <div class="timer-text" id="nfTimer">5.0</div>
       </div>
+      <div class="ctl-dock">
       <div class="nf-actions">
         <button class="btn primary wide" id="nfReveal" type="button">정답 확인</button>
         <button class="btn primary wide hidden" id="nfNext" type="button">다음 문제 →</button>
+      </div>
       </div>
       <div class="answer-area hidden" id="nfAnswer"></div>
       <div class="field inline-time">

@@ -37,6 +37,7 @@ export function mount(container, api) {
     <div class="nf cm">
       <div class="nf-meta"><span id="cmTitle"></span><span id="cmProg"></span></div>
       <div class="tab-wrap score-wrap" id="cmScore"></div>
+      <div class="ctl-dock">
       <div class="ed-actions" style="margin-top:10px">
         <button class="btn" id="cmListen" type="button">▶ 듣기</button>
         <button class="btn primary" id="cmFollow" type="button">따라 치기</button>
@@ -47,6 +48,7 @@ export function mount(container, api) {
         <button type="button" data-bpm="5">+5</button>
         <button type="button" class="btn small" id="cmNext">다음 곡</button>
       </div></div>
+      </div>
       <p class="muted small nf-foot">노랑 = 지금 칠 음. 위쪽 숫자 묶음(동시음)이 코드, 맨 위 음이 멜로디. 처음 4박은 준비 클릭</p>
     </div>`;
   const $ = s => container.querySelector(s);

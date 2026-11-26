@@ -55,12 +55,14 @@ export function mount(container, api) {
       <p class="muted small" id="csTip"></p>
       <div class="seg wide-seg" id="csHintLive">${HINTS.map(([v, n]) => `<button type="button" data-v="${v}" class="${v === st.hint ? "sel" : ""}">${n}</button>`).join("")}</div>
       <div class="jam-state muted small" id="csState">정지</div>
+      <div class="ctl-dock">
       <div class="nf-actions" style="margin-top:8px"><button class="btn primary wide" id="csPlay" type="button" data-autostart>반주 시작</button></div>
       <div class="bf-controls"><div class="bpm-row">
         <button type="button" data-bpm="-5">−5</button>
         <div class="bpm-val"><b id="csBpm">${st.bpm}</b><span>BPM</span></div>
         <button type="button" data-bpm="5">+5</button>
       </div></div>
+      </div>
       <p class="muted small nf-foot">초록 = 코드 근음, 주황 = 코드톤(3·5·7음), 흰색 = 나머지 스케일 음. 숫자는 지금 코드 근음 기준 도수</p>
     </div>`;
   const $ = s => container.querySelector(s);

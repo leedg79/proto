@@ -94,3 +94,32 @@ export function dateKey(year, month, day) {
   const p = n => String(n).padStart(2, "0");
   return `${year}-${p(month)}-${p(day)}`;
 }
+
+// ── 홈 연습량 그래프 (화성학 / 테크닉 / 총량, 분 단위) ──
+export const HARMONY = ["notes", "chords", "scales", "ear"];
+export const TECHNIQUE = ["rhythm", "technique", "licks"];
+const shiftKey = (key, d) => { const [y, m, dd] = key.split("-").map(Number); const t = new Date(y, m - 1, dd + d); return dateKey(t.getFullYear(), t.getMonth() + 1, t.getDate()); };
+const WEEKDAY = ["일", "월", "화", "수", "목", "금", "토"];
+// range "week": 오늘 포함 최근 7일(하루 1점), "month": 최근 28일을 7일씩 4점
+export function practiceSeries(records, todayKey, range = "week") {
+  const days = range === "month" ? 28 : 7, size = range === "month" ? 7 : 1;
+  const start = shiftKey(todayKey, -(days - 1));
+  const pts = [];
+  for (let i = 0; i < days / size; i++) {
+    const from = shiftKey(start, i * size), to = shiftKey(start, i * size + size - 1);
+    const [, fm, fd] = from.split("-").map(Number);
+    const label = size === 1 ? WEEKDAY[new Date(...from.split("-").map((v, k) => (k === 1 ? Number(v) - 1 : Number(v)))).getDay()] : `${fm}/${fd}~`;
+    pts.push({ from, to, label, harmony: 0, technique: 0, total: 0 });
+  }
+  for (const r of records) {
+    if (!r.date || r.date < start || r.date > todayKey) continue;
+    const p = pts.find(x => r.date >= x.from && r.date <= x.to);
+    if (!p) continue;
+    const min = (r.activeSec || 0) / 60;
+    p.total += min;
+    if (HARMONY.includes(r.module)) p.harmony += min;
+    else if (TECHNIQUE.includes(r.module)) p.technique += min;
+  }
+  for (const p of pts) for (const k of ["harmony", "technique", "total"]) p[k] = Math.round(p[k]);
+  return pts;
+}

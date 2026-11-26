@@ -52,9 +52,11 @@ export function mount(container, api) {
       </div>
       <div class="cycle-dots" id="rcDots">${Array.from({ length: R.DECK_SIZE }, () => "<i></i>").join("")}</div>
       <div class="timer-wrap"><div class="timer-track"><div id="rcBar"></div></div><div class="timer-text" id="rcTimer">0.0</div></div>
+      <div class="ctl-dock">
       <div class="nf-actions">
         <button class="btn primary wide" id="rcReveal" type="button">정답 확인</button>
         <button class="btn primary wide hidden" id="rcNext" type="button">다음 문제 →</button>
+      </div>
       </div>
       <div class="answer-area hidden" id="rcAnswer"></div>
       <div class="field inline-time">

@@ -55,12 +55,14 @@ export function mountSegPlayer(container, api, opts) {
       <div class="sb-state"><span class="state-label" id="spCap">READY</span><span class="muted small" id="spInfo"></span></div>
       <div class="fretboard sb-board" id="spBoard"></div>
       <div class="beats bf-beats" id="spBeats">${[0, 1, 2, 3].map(i => `<span class="beat ${i === 0 ? "accent" : ""}"></span>`).join("")}</div>
+      <div class="ctl-dock">
       <div class="nf-actions" style="margin-top:12px"><button class="btn primary wide" id="spPlay" type="button" data-autostart>연주 시작</button></div>
       <div class="bf-controls"><div class="bpm-row">
         <button type="button" data-bpm="-5">−5</button><button type="button" data-bpm="-1">−1</button>
         <div class="bpm-val"><b id="spBpmVal">${st.bpm}</b><span>BPM</span></div>
         <button type="button" data-bpm="1">+1</button><button type="button" data-bpm="5">+5</button>
       </div></div>
+      </div>
       <p class="muted small nf-foot">${esc(opts.foot || "")} ${hint === "all" ? "노랑 = 지금 칠 음, 초록 = 근음." : "구간 끝 1마디는 확인 마디(정답 모양 표시)."} 칩을 누르면 그 구간부터 연습</p>
     </div>`;
   const $ = s => container.querySelector(s);

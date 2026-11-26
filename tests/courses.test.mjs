@@ -27,3 +27,22 @@ test("코스 항목 해 본 횟수", () => {
   assert.equal(itemCount(it, recs), 1);
   assert.equal(itemCount(COURSES[1][0], [{ module: "notes", level: "n1", task: "note-finder", topics: [] }]), 1);
 });
+
+import { practiceSeries } from "../js/core/journal.js";
+import { practiceChartSvg } from "../js/ui/practice-chart.js";
+test("홈 연습량: 1주 7점·1달 4점, 화성학/테크닉 구분", () => {
+  const recs = [
+    { date: "2026-11-26", module: "rhythm", activeSec: 1200 },
+    { date: "2026-11-26", module: "ear", activeSec: 300 },
+    { date: "2026-11-24", module: "chords", activeSec: 600 },
+    { date: "2026-10-01", module: "notes", activeSec: 600 }
+  ];
+  const w = practiceSeries(recs, "2026-11-26", "week");
+  assert.equal(w.length, 7);
+  assert.deepEqual(w[6], { from: "2026-11-26", to: "2026-11-26", label: "목", harmony: 5, technique: 20, total: 25 });
+  assert.equal(w[4].harmony, 10);
+  const m = practiceSeries(recs, "2026-11-26", "month");
+  assert.equal(m.length, 4);
+  assert.equal(m.reduce((a, p) => a + p.total, 0), 35);
+  assert.equal((practiceChartSvg(w).match(/<polyline/g) || []).length, 3);
+});

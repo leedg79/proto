@@ -56,6 +56,7 @@ export function mount(container, api) {
       <div id="rrGrid"></div>
       <p class="small rh-tip hidden" id="rrTip"></p>
       <div class="jam-state muted small" id="rrState"></div>
+      <div class="ctl-dock">
       <div class="nf-actions" style="margin-top:8px">
         <button class="btn primary wide" id="rrTry" type="button">치기 시작 (클릭에 맞춰 2번)</button>
         <button class="btn wide" id="rrReveal" type="button" style="margin-top:8px">정답 듣기·보기</button>
@@ -66,6 +67,7 @@ export function mount(container, api) {
         <div class="bpm-val"><b id="rrBpm">${st.bpm}</b><span>BPM</span></div>
         <button type="button" data-bpm="1">+1</button><button type="button" data-bpm="5">+5</button>
       </div></div>
+      </div>
     </div>`;
   const $ = s => container.querySelector(s);
   const running = () => { const s = api.getActive(); return !!s && s.status === "running"; };

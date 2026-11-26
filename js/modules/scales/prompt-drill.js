@@ -49,9 +49,11 @@ export function mountPromptDrill(container, api, opts) {
       </div>
       <div class="cycle-dots" id="pdDots"></div>
       <div class="timer-wrap"><div class="timer-track"><div id="pdBar"></div></div><div class="timer-text" id="pdTimer">0.0</div></div>
+      <div class="ctl-dock">
       <div class="nf-actions">
         <button class="btn primary wide" id="pdReveal" type="button">정답 확인</button>
         <button class="btn primary wide hidden" id="pdNext" type="button">다음 문제 →</button>
+      </div>
       </div>
       <div class="answer-area" id="pdAnswer"></div>
       <div class="field inline-time">

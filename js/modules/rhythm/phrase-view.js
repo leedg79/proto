@@ -58,6 +58,7 @@ export function mount(container, api) {
       <p class="small rh-tip" id="phTip"></p>
       ${segHtml("phMode", MODES, st.mode)}
       <div class="jam-state muted small" id="phState">정지</div>
+      <div class="ctl-dock">
       <div class="nf-actions" style="margin-top:8px"><button class="btn primary wide" id="phPlay" type="button" data-autostart>시작</button></div>
       <div class="btn-row" style="gap:8px;margin-top:8px">
         <button class="btn small" id="phPrev" type="button">← 이전</button>
@@ -68,6 +69,7 @@ export function mount(container, api) {
         <div class="bpm-val"><b id="phBpm">${st.bpm}</b><span>BPM</span></div>
         <button type="button" data-bpm="1">+1</button><button type="button" data-bpm="5">+5</button>
       </div></div>
+      </div>
     </div>`;
   const $ = s => container.querySelector(s);
   const running = () => { const s = api.getActive(); return !!s && s.status === "running"; };

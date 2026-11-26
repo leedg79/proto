@@ -72,7 +72,9 @@ function promptTask({ p, storeKey, kind }) {
           ${kind === "vary" ? `<div class="field" style="margin-top:10px"><label>변형 종류 (바로 바뀜)</label>${segHtml("apType", VTYPES, st.vtype || "random")}</div>` : ""}
           <div id="apOrig"></div>
           <div class="timer-wrap"><div class="timer-track"><div id="apBar"></div></div><div class="timer-text" id="apTimer">0.0</div></div>
+          <div class="ctl-dock">
           <div class="nf-actions"><button class="btn primary wide" id="apReveal" type="button">정답 확인</button><button class="btn primary wide hidden" id="apNext" type="button">다음 →</button></div>
+          </div>
           <div id="apAnswer"></div>
         </div>`;
       const $ = s => container.querySelector(s);
@@ -187,6 +189,7 @@ export const LickBacking = {
         <div class="lb-phase" id="lbPhase">준비</div>
         <div id="lbCard"></div>
         <div class="jam-state muted small" id="lbState">정지</div>
+        <div class="ctl-dock">
         <div class="nf-actions" style="margin-top:8px"><button class="btn primary wide" id="lbPlay" type="button" data-autostart>반주 시작</button></div>
         <div class="bf-controls"><div class="bpm-row">
           <button type="button" data-bpm="-5">−5</button>
@@ -194,6 +197,7 @@ export const LickBacking = {
           <button type="button" data-bpm="5">+5</button>
           <button type="button" class="btn small" id="lbSkip">다음 릭</button>
         </div></div>
+        </div>
       </div>`;
     const $ = s => container.querySelector(s);
     const running = () => { const s = api.getActive(); return !!s && s.status === "running"; };

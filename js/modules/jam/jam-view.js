@@ -27,12 +27,14 @@ export function renderJam(root, { toast }) {
       <div class="jam-chart" id="jamChart"></div>
       <div class="beats bf-beats" id="jamBeats">${[0, 1, 2, 3].map(i => `<span class="beat ${i === 0 ? "accent" : ""}"></span>`).join("")}</div>
       <div class="jam-state muted small" id="jamState">정지</div>
+      <div class="ctl-dock">
       <button class="btn primary wide" id="jamPlay" type="button" style="margin-top:10px">재생</button>
       <div class="bf-controls"><div class="bpm-row">
         <button type="button" data-bpm="-5">−5</button><button type="button" data-bpm="-1">−1</button>
         <div class="bpm-val"><b id="jamBpm">${bpm}</b><span>BPM</span></div>
         <button type="button" data-bpm="1">+1</button><button type="button" data-bpm="5">+5</button>
       </div></div>
+      </div>
     </div>
     <div class="panel">
       <h3 class="panel-title">파트 음량</h3>

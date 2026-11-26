@@ -64,6 +64,7 @@ export function makeTechTask(level) {
         <p class="small rh-tip" id="tqTip"></p>
         <div class="tq-bpm"><div><b id="tqBpm">-</b><span>BPM</span></div><small id="tqBest" class="muted"></small></div>
         <div class="tq-mic"><span id="tqMicState" class="muted small">마이크 꺼짐</span><span class="tq-meter"><i id="tqMeter"></i></span><button class="btn small" id="tqCal" type="button">박자 보정</button></div>
+        <details class="tq-setup"><summary>마이크·입력 설정 <small class="muted">장치 · 감도 · 입력 확인</small></summary>
         <div class="tq-io">
           <div class="field"><label for="tqInput">입력 장치</label><select id="tqInput"><option value="">아이폰이 정한 기본 입력</option></select></div>
           <p class="muted small" id="tqInputInfo" style="margin:4px 0 0">판정을 시작하거나 "입력 확인"을 누르면 장치 목록을 불러옴</p>
@@ -80,21 +81,24 @@ export function makeTechTask(level) {
           <div class="tq-strip" id="tqStrip"><span class="muted small">치는 대로 잡힌 어택이 점으로 찍힘</span></div>
           <b id="tqCount" class="small">0</b>
         </div>
+        </details>
         <div class="jam-state muted small" id="tqState"></div>
+        <div id="tqResult" class="tq-result hidden"></div>
+        <div class="ctl-dock">
         <div class="nf-actions" style="margin-top:8px">
           <button class="btn primary wide" id="tqJudge" type="button">판정 시작 (클릭 4번 뒤 연주)</button>
-          <button class="btn wide" id="tqDemo" type="button" style="margin-top:8px">시연 듣기</button>
         </div>
-        <div id="tqResult" class="tq-result hidden"></div>
         <div class="btn-row" style="gap:8px;margin-top:8px">
-          <button class="btn small" id="tqPrev" type="button">← 이전 연습곡</button>
-          <button class="btn small" id="tqNext" type="button">다음 연습곡 →</button>
+          <button class="btn small" id="tqPrev" type="button">← 이전</button>
+          <button class="btn small" id="tqDemo" type="button">시연 듣기</button>
+          <button class="btn small" id="tqNext" type="button">다음 →</button>
         </div>
         <div class="bf-controls"><div class="bpm-row">
           <button type="button" data-bpm="-5">−5</button><button type="button" data-bpm="-1">−1</button>
           <div class="bpm-val"><b id="tqBpm2">-</b><span>BPM</span></div>
           <button type="button" data-bpm="1">+1</button><button type="button" data-bpm="5">+5</button>
         </div></div>
+        </div>
       </div>`;
     const $ = s => container.querySelector(s);
     const running = () => { const s = api.getActive(); return !!s && s.status === "running"; };

@@ -2,6 +2,7 @@
 import { MODULES, findModule, findLevel, findTask, moduleName, levelName, taskName, SESSION_TYPES, MODULE_ORDER, topicsFor, topicLabel } from "./data/catalog.js";
 import * as Store from "./core/storage.js";
 import { STEPS, COURSES, courseItem, itemCount } from "./data/courses.js";
+import { practiceChartSvg, fmtMin } from "./ui/practice-chart.js";
 import * as S from "./core/session.js";
 import { formatDuration, formatShort, localDateKey } from "./core/clock.js";
 import * as J from "./core/journal.js";
@@ -39,7 +40,7 @@ import * as Ev from "./eval/evaluator.js";
 import { micLevel } from "./audio/mic.js";
 import { summary as evalSummary, summaryText as evalText } from "./eval/eval-core.js";
 
-const APP_VERSION = "2.8.0";
+const APP_VERSION = "2.9.0";
 
 // 구현된 과제의 연습 화면 (모듈/과제 → 화면 모듈)
 // 화면 모듈: settingsHtml, bindSettings, readSettings, mount, clearFinder
@@ -184,12 +185,25 @@ function parentOf(parts) {
   return "";
 }
 
+const MIC_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>';
+const SLIDERS_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>';
+const NAV = {
+  back: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg><span>뒤로</span>',
+  home: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11l8-7 8 7"/><path d="M6 10v10h12V10"/></svg><span>홈</span>'
+};
 function setTop(title, parts) {
   $("#topTitle").innerHTML = title ? esc(title) : "<b>FRET</b> LAB";
-  const back = $("#backBtn");
+  const back = $("#backBtn"), home = $("#homeBtn");
   const isHome = parts.length === 0;
-  back.classList.toggle("invisible", isHome);
-  back.onclick = () => go(parentOf(parts));
+  // 홈: 왼쪽 = 데이터 관리, 오른쪽 = 학습일지 / 나머지 화면: 뒤로 · 홈
+  back.classList.toggle("tool", isHome);
+  home.classList.toggle("tool", isHome);
+  back.innerHTML = isHome ? `${ICON.data.replace("<svg ", '<svg aria-hidden="true" ')}<span>데이터</span>` : NAV.back;
+  home.innerHTML = isHome ? `${ICON.journal.replace("<svg ", '<svg aria-hidden="true" ')}<span>학습일지</span>` : NAV.home;
+  back.setAttribute("aria-label", isHome ? "데이터 관리" : "뒤로가기");
+  home.setAttribute("aria-label", isHome ? "학습일지" : "홈");
+  back.onclick = () => go(isHome ? "data" : parentOf(parts));
+  home.onclick = () => go(isHome ? "journal" : "");
 }
 
 let prevMain = null;
@@ -237,7 +251,7 @@ function render() {
 // ───────────── 백킹 트랙 ─────────────
 function renderJamPage() {
   view.innerHTML = `
-    <div class="page-head"><div class="eyebrow">Backing Track</div><h1>백킹 트랙</h1></div>
+    
     <div id="jamArea" style="display:grid;gap:14px"></div>`;
   onCleanup(renderJam($("#jamArea"), { toast }));
   return "백킹 트랙";
@@ -257,21 +271,33 @@ document.addEventListener("click", async e => {
 
 // ───────────── 홈 ─────────────
 const ICON = {
-  jam: '<svg viewBox="0 0 24 24"><path d="M9 18V6l11-2v12"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg>',
-  journal: '<svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 9h16M9 3v4M15 3v4"/></svg>',
-  data: '<svg viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 17v3h16v-3"/></svg>'
+  jam: '<svg viewBox="0 0 24 24"><path d="M9 18V6l11-2v12"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="17.5" cy="16" r="2.5"/></svg>',
+  journal: '<svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M8 3v4M16 3v4M3.5 10h17"/></svg>',
+  data: '<svg viewBox="0 0 24 24"><path d="M12 3v10M8 9l4 4 4-4"/><path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>',
+  notes: '<svg viewBox="0 0 24 24"><path d="M3 7h18M3 12h18M3 17h18M9 4v16M15 4v16"/></svg>',
+  chords: '<svg viewBox="0 0 24 24"><rect x="5" y="3.5" width="14" height="17" rx="2"/><path d="M9.7 3.5v17M14.3 3.5v17M5 9h14M5 14.5h14"/></svg>',
+  rhythm: '<svg viewBox="0 0 24 24"><path d="M4 17V9M9 17V5M14 17v-6M19 17V7M3 20h18"/></svg>',
+  scales: '<svg viewBox="0 0 24 24"><path d="M4 19h4v-4h4v-4h4V7h4"/></svg>',
+  licks: '<svg viewBox="0 0 24 24"><path d="M3 14c2-5 4-5 6 0s4 5 6 0 4-5 6 0"/></svg>',
+  technique: '<svg viewBox="0 0 24 24"><path d="M13 3L5 13.5h6L10 21l8-10.5h-6z"/></svg>',
+  ear: '<svg viewBox="0 0 24 24"><path d="M7 15a5 5 0 1 1 9-3c0 2.5-2 3-3 4.5S12 21 10 21"/><path d="M10 12a2 2 0 1 1 3.5 1.3"/></svg>'
 };
 
 function renderHome() {
   const mode = Store.getSetting("home.view", "module");
   const step = Math.min(5, Math.max(1, Number(Store.getSetting("home.step", 1)) || 1));
+  const range = Store.getSetting("home.range", "week") === "month" ? "month" : "week";
+  const viewSeg = `<div class="seg home-view" id="homeView"><button type="button" data-v="module" class="${mode === "module" ? "sel" : ""}">모듈</button><button type="button" data-v="step" class="${mode === "step" ? "sel" : ""}">단계</button></div>`;
   view.innerHTML = `
-    <div class="page-head">
-      <div class="eyebrow">Guitar Practice System</div>
-      <h1>무엇을 연습할까요</h1>
-    </div>
-    <div class="today" id="today"><span class="muted">오늘 연습</span> <b>-</b></div>
-    <div class="seg home-view" id="homeView"><button type="button" data-v="module" class="${mode === "module" ? "sel" : ""}">모듈별</button><button type="button" data-v="step" class="${mode === "step" ? "sel" : ""}">단계별</button></div>
+    <section class="pc-card" id="pcCard">
+      <div class="pc-head">
+        <div class="today" id="today"><span class="muted">오늘</span> <b>-</b></div>
+        <div class="seg pc-range" id="pcRange"><button type="button" data-r="week" class="${range === "week" ? "sel" : ""}">1주</button><button type="button" data-r="month" class="${range === "month" ? "sel" : ""}">1달</button></div>
+      </div>
+      <div class="pc-chart" id="pcChart"></div>
+      <div class="pc-legend" id="pcLegend"></div>
+    </section>
+    <div class="home-sub"><h2>연습 메뉴</h2>${viewSeg}</div>
     ${mode === "step" ? `
     <div class="step-tabs" id="stepTabs">${STEPS.map(x => `<button type="button" data-step="${x.id}" class="${x.id === step ? "sel" : ""}"><b>${x.id}</b><span>${esc(x.name)}</span></button>`).join("")}</div>
     <p class="step-goal">${esc(STEPS[step - 1].goal)}</p>
@@ -290,22 +316,22 @@ function renderHome() {
         </button>`).join("")}
     </div>` : `
     <div class="module-grid">
-      ${MODULES.map((m, i) => `
-        <button class="module-card ${MODULES.length % 2 && i === MODULES.length - 1 ? "wide" : ""}" type="button" data-mod="${m.id}" style="--mc:${modColor(m.id)}">
-          <span class="bar"></span>
-          <span><strong>${esc(m.name)}</strong><small>${esc(m.sub)}</small></span>
-          <span class="meta">${m.levels.length} LEVELS</span>
+      ${MODULES.map(m => `
+        <button class="module-card" type="button" data-mod="${m.id}" style="--mc:${modColor(m.id)}" aria-label="${esc(m.name)} · ${esc(m.sub)}">
+          <span class="mc-ic">${ICON[m.id] || ""}</span>
+          <strong>${esc(m.name)}</strong>
         </button>`).join("")}
+      <button class="module-card" type="button" data-go="jam" style="--mc:var(--accent)" aria-label="백킹 트랙">
+        <span class="mc-ic">${ICON.jam}</span>
+        <strong>백킹 트랙</strong>
+      </button>
     </div>`}
-    <div class="tool-row">
-      <button class="tool-card" type="button" data-go="jam">${ICON.jam}<div><b>백킹 트랙</b><span>진행·키·템포 반주</span></div></button>
-      <button class="tool-card" type="button" data-go="journal">${ICON.journal}<div><b>학습일지</b><span>연·월·일 기록</span></div></button>
-      <button class="tool-card" type="button" data-go="data">${ICON.data}<div><b>데이터 관리</b><span>백업 · 복원</span></div></button>
-    </div>
     <div id="homeNotice"></div>`;
   view.onclick = e => {
     const v = e.target.closest("#homeView [data-v]");
     if (v) { Store.setSetting("home.view", v.dataset.v); return renderHome(); }
+    const r = e.target.closest("#pcRange [data-r]");
+    if (r) { Store.setSetting("home.range", r.dataset.r); return renderHome(); }
     const st = e.target.closest("#stepTabs [data-step]");
     if (st) { Store.setSetting("home.step", Number(st.dataset.step)); return renderHome(); }
     const ci = e.target.closest("[data-ci]");
@@ -319,7 +345,12 @@ function renderHome() {
     const today = localDateKey(Date.now());
     const d = J.summarizeDay(list, today);
     const el = $("#today");
-    if (el) el.innerHTML = `<span class="muted">오늘 연습</span> <b>${formatShort(d.totals.sec)}</b> <span class="muted">· 완료 ${d.totals.units}회 · 세션 ${d.totals.sessions}개</span>`;
+    if (el) el.innerHTML = `<span class="muted">오늘</span> <b>${formatShort(d.totals.sec)}</b> <span class="muted">· 완료 ${d.totals.units}회</span>`;
+    const pts = J.practiceSeries(list, today, range);
+    if ($("#pcChart")) $("#pcChart").innerHTML = practiceChartSvg(pts);
+    const sum = k => pts.reduce((a, p) => a + p[k], 0);
+    const leg = (k, name) => `<div><span class="pc-key ${k}">${name}</span><b>${fmtMin(sum(k))}</b></div>`;
+    if ($("#pcLegend")) $("#pcLegend").innerHTML = leg("total", "총량") + leg("harmony", "화성학") + leg("technique", "테크닉");
     if (mode === "step") {
       let done = 0, total = 0;
       COURSES[step].forEach((it, i) => {
@@ -463,10 +494,10 @@ function renderTask(modId, lvlId, taskId) {
           : `<b>학습 콘텐츠 준비 중</b><br>이 과제의 실제 연습 화면은 ${t.pending ? esc(t.pending) : `개발 ${m.stage}단계에서 구현됨`}. 지금은 학습 주제를 골라 세션 시작·일시정지·종료와 기록·학습일지를 사용할 수 있음`}
       </div>`}
       ${t.reference ? "" : `
-      <div class="span-all">
+      <div class="span-all ctl-dock task-dock">
         ${otherActive ? `<div class="autopause" style="margin-bottom:10px">다른 세션이 진행 중임: ${esc(moduleName(active.module))} · ${esc(taskName(active.module, active.level, active.task))}</div>` : ""}
         <button class="btn primary wide" id="startBtn" type="button" style="min-height:58px;font-size:18px">세션 시작</button>
-        <p class="muted small" style="text-align:center;margin:8px 0 0">다음 화면에서 "연습 시작"을 눌러야 시간 측정이 시작됨. 세션 중에도 설정을 바꿀 수 있고, 화면을 나가면 자동 종료됨(완료 1회 이상일 때만 기록)</p>
+        <p class="muted small" style="text-align:center;margin:0">설정은 세션 중에도 바꿀 수 있음 · 화면을 나가면 자동 종료</p>
       </div>`}
     </div>`;
   if (content) content.bindSettings(view);
@@ -512,10 +543,14 @@ const EVAL_MODULES = ["notes", "chords", "rhythm", "scales", "licks", "technique
 
 function bindEvalPanel() {
   const sw = $("#evalSwitch");
-  const draw = () => { sw.textContent = Ev.isOn() ? "ON" : "OFF"; sw.classList.toggle("on", Ev.isOn()); };
+  const draw = () => {
+    sw.textContent = Ev.isOn() ? "ON" : "OFF"; sw.classList.toggle("on", Ev.isOn());
+    const c = $("#evalChip"); if (c) { c.querySelector("span").textContent = Ev.isOn() ? "평가 ON" : "평가 OFF"; c.classList.toggle("sel", Ev.isOn()); }
+    const l = $("#evalLast"); if (l) l.classList.toggle("hidden", !Ev.isOn());
+  };
   const off = Ev.onChange(({ text, kind }) => {
     const el = $("#evalLast"); if (!el) return;
-    el.textContent = text; el.className = "eval-last " + (kind || "");
+    el.textContent = text; el.className = "eval-last " + (kind || "") + (Ev.isOn() ? "" : " hidden");
   });
   onCleanup(off);
   sw.onclick = async () => {
@@ -570,8 +605,7 @@ function renderSession() {
         <div class="panel eval-panel" id="evalPanel">
           <div class="metro-top"><h3>연주 평가 <small class="muted">마이크</small></h3><button class="switch" id="evalSwitch" type="button">OFF</button></div>
           <div class="eval-meter"><i id="evalMeter"></i></div>
-          <div class="eval-heard muted small" id="evalHeard">켜면 마이크(또는 고른 입력 장치)로 연주를 듣고 문제마다 판정함</div>
-          <div class="eval-last" id="evalLast"></div>
+          <div class="eval-heard muted small" id="evalHeard">켜면 마이크(또는 고른 입력 장치)로 연주를 듣고 문제마다 판정함. 결과는 연습 화면 위쪽 한 줄에 나옴</div>
           <div class="eval-sum muted small" id="evalSum"></div>
         </div>` : "";
   const tagsHtml = s => `<span class="tag accent">${esc(SESSION_TYPES[s.type] || s.type)}</span>${(s.topics || []).map(id => `<span class="tag">${esc(topicLabel(s.module, s.level, s.task, [id]))}</span>`).join("")}`;
@@ -583,30 +617,44 @@ function renderSession() {
       </div>`;
   // 세션 중 설정 변경: 학습 주제 + 과제 설정
   const live = content ? `
-      <details class="panel span-all live-settings" id="liveSettings">
-        <summary>설정 변경 <small class="muted">학습 주제·키·속도 등 — 바꾸고 "적용"</small></summary>
-        ${topics.length ? `<div class="topic-list" id="liveTopics" style="margin-top:12px">${topics.map(tp => `<label class="topic ${tp.pending ? "pending" : ""}"><input type="checkbox" value="${esc(tp.id)}" ${(s0.topics || []).includes(tp.id) ? "checked" : ""} ${tp.pending ? "disabled" : ""}><span>${esc(tp.name)}</span></label>`).join("")}</div>` : ""}
+      <div class="live-settings" id="liveSettings">
+        ${topics.length ? `<h4 class="sheet-h">학습 주제</h4><div class="topic-list" id="liveTopics">${topics.map(tp => `<label class="topic ${tp.pending ? "pending" : ""}"><input type="checkbox" value="${esc(tp.id)}" ${(s0.topics || []).includes(tp.id) ? "checked" : ""} ${tp.pending ? "disabled" : ""}><span>${esc(tp.name)}</span></label>`).join("")}</div>` : ""}
         <div id="liveForm" style="margin-top:14px">${content.settingsHtml(s0.level)}</div>
-        <button class="btn primary wide" id="liveApply" type="button" style="margin-top:14px">적용</button>
-        <p class="muted small" style="margin:6px 0 0">적용하면 연습 화면이 새 설정으로 다시 시작됨. 연습시간과 완료 횟수는 이어짐</p>
-      </details>` : "";
+        <button class="btn primary wide" id="liveApply" type="button" style="margin-top:16px">적용하고 계속</button>
+        <p class="muted small" style="margin:6px 0 0">적용하면 연습 화면이 새 설정으로 다시 시작됨. 연습시간과 완료 횟수는 이어짐 · 완료 기준: ${esc(unitLabel)}</p>
+      </div>` : "";
   const gate = `
-      <div class="panel span-all practice-gate" id="gate">
-        <p>준비가 되면 연습을 시작함. 이 버튼을 누른 순간부터 연습시간을 잼</p>
-        <button class="btn primary wide" id="practiceStart" type="button" style="min-height:58px;font-size:18px">연습 시작</button>
+      <div class="practice-gate span-all" id="gate">
+        <button class="gate-btn" id="practiceStart" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l12-7.5z"/></svg><span>연습 시작</span></button>
+        <p>누르면 시간이 재지고 반주가 함께 시작됨<br>화면을 나가면 자동 종료 · 완료 1회 이상만 기록</p>
       </div>`;
   view.innerHTML = content ? `
-    <div class="session-layout content-layout">
-      ${head}
-      <div class="panel status-bar span-all">
-        <div class="status-time"><div class="state-label" id="stateLabel">READY</div><div class="mid-time" id="bigTime">00:00</div></div>
+    <div class="sess content-layout">
+      <div class="sess-bar">
+        <div class="sess-name"><small>${esc(levelName(s0.module, s0.level))}</small><b>${esc(taskName(s0.module, s0.level, s0.task).split(" · ")[0])}</b></div>
+        <div class="sess-clock"><i class="sc-dot" id="stateDot"></i><span id="bigTime">00:00</span><span class="state-label sr" id="stateLabel">READY</span></div>
         <button class="btn warn" id="pauseBtn" type="button">일시정지</button>
         <button class="btn danger" id="endBtn" type="button">종료</button>
       </div>
-      ${live}
+      <div class="sess-strip">
+        <span class="ss-units">완료 <b id="unitCount">0</b>회</span>
+        <span class="ss-tags" id="sessTags">${tagsHtml(s0)}</span>
+        ${evalable ? `<button class="chip ss-chip" id="evalChip" type="button" aria-label="연주 평가 설정 열기">${MIC_ICON}<span>평가 OFF</span></button>` : ""}
+        <button class="chip ss-chip" id="openSettings" type="button" aria-label="세션 설정 열기">${SLIDERS_ICON}<span>설정</span></button>
+      </div>
+      ${evalable ? `<div class="eval-last hidden" id="evalLast"></div>` : ""}
       ${gate}
-      <div class="panel content-panel" id="contentArea"></div>
-      <div style="display:grid;gap:12px;align-content:start">${unitsPanel}${evalPanel}</div>
+      <div class="content-panel" id="contentArea"></div>
+    </div>
+    <div class="ssheet hidden" id="sessSheet" role="dialog" aria-label="세션 설정">
+      <div class="sheet-bg" data-close></div>
+      <div class="sheet-card">
+        <div class="sheet-grip"></div>
+        <div class="sheet-top"><b>세션 설정</b><button class="nav-btn" type="button" data-close aria-label="닫기"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+        ${evalable ? `<div class="seg sheet-tabs" id="sheetTabs"><button type="button" data-tab="set" class="sel">연습 설정</button><button type="button" data-tab="eval">연주 평가</button></div>` : ""}
+        <div class="sheet-body" data-pane="set">${live}</div>
+        ${evalable ? `<div class="sheet-body hidden" data-pane="eval">${evalPanel}</div>` : ""}
+      </div>
     </div>` : `
     <div class="session-layout">
       ${head}
@@ -644,6 +692,23 @@ function renderSession() {
   };
   // 반주·연주형 과제는 "연습 시작"과 함께 재생 시작 (자동 시험에서는 window.__fretlabNoAutostart로 끔)
   const autostart = () => { if (window.__fretlabNoAutostart) return; const b = $("#contentArea [data-autostart]"); if (b) b.click(); };
+  const sheet = $("#sessSheet");
+  const openSheet = (tab = "set") => {
+    if (!sheet) return;
+    sheet.classList.remove("hidden");
+    $$("#sessSheet [data-pane]").forEach(p => p.classList.toggle("hidden", p.dataset.pane !== tab));
+    $$("#sheetTabs [data-tab]").forEach(b => b.classList.toggle("sel", b.dataset.tab === tab));
+  };
+  const closeSheet = () => { if (sheet) sheet.classList.add("hidden"); };
+  if (sheet) {
+    sheet.addEventListener("click", e => {
+      if (e.target.closest("[data-close]")) return closeSheet();
+      const tb = e.target.closest("#sheetTabs [data-tab]");
+      if (tb) openSheet(tb.dataset.tab);
+    });
+    $("#openSettings").onclick = () => openSheet("set");
+    if ($("#evalChip")) $("#evalChip").onclick = () => openSheet("eval");
+  }
   Ev.setSink(r => S.recordEval(r));
   mountContent();
   onCleanup(() => { if (unmount) try { unmount(); } catch (_) {} });
@@ -661,7 +726,7 @@ function renderSession() {
       if (content.clearFinder) content.clearFinder();
       mountContent();
       $("#sessTags").innerHTML = tagsHtml(S.getActive());
-      $("#liveSettings").open = false;
+      closeSheet();
       toast("새 설정을 적용함");
       if (S.getActive().status === "running") autostart();
     };
@@ -692,9 +757,11 @@ function renderSession() {
     $("#bigTime").textContent = formatDuration(S.elapsedSec());
     const lab = $("#stateLabel");
     lab.textContent = ready ? "READY" : running ? "RUNNING" : "PAUSED";
-    lab.className = "state-label " + (running ? "running" : "paused");
-    $("#pauseBtn").textContent = running ? "일시정지" : "재개";
+    lab.className = "state-label sr " + (running ? "running" : "paused");
+    if ($("#stateDot")) $("#pauseBtn").innerHTML = running ? `<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg><span class="sr">일시정지</span>` : `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l12-7.5z"/></svg><span class="sr">재개</span>`;
+    else $("#pauseBtn").textContent = running ? "일시정지" : "재개";
     $("#pauseBtn").className = "btn " + (running ? "warn" : "primary");
+    if ($("#stateDot")) $("#stateDot").className = "sc-dot " + (ready ? "" : running ? "running" : "paused");
     $("#pauseBtn").classList.toggle("hidden", ready);
     $("#gate").classList.toggle("hidden", !ready);
     if ($("#contentArea")) $("#contentArea").classList.toggle("hidden", ready);
@@ -1164,6 +1231,7 @@ function updateDock() {
   const onSession = parseRoute()[0] === "session";
   const show = !!s && !onSession;
   dock.classList.toggle("hidden", !show);
+  document.body.classList.toggle("has-dock", show);
   clearInterval(dockTimer);
   if (!show) return;
   const paint = () => {
@@ -1199,7 +1267,6 @@ async function boot() {
     const s = S.getActive();
     if (document.visibilityState === "visible" && s && s.status === "running") holdScreen(true);
   });
-  $("#homeBtn").onclick = () => go("");
   const dock = $("#sessionDock");
   dock.onclick = () => go("session");
   dock.onkeydown = e => { if (e.key === "Enter") go("session"); };

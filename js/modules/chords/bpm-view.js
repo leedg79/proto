@@ -67,8 +67,9 @@ export function mount(container, api) {
       </div>
       <div class="bf-next"><span class="muted small">다음</span> <b id="bfNext">-</b> <span class="muted small" id="bfNextSub"></span></div>
       <div class="cycle-dots bf-dots" id="bfDots">${Array.from({ length: B.CHORDS_PER_PASS }, () => "<i></i>").join("")}</div>
-      <div class="nf-actions"><button class="btn primary wide" id="bfPlay" type="button" data-autostart>연주 시작</button></div>
       <div class="bf-diagram hidden" id="bfDiagram"></div>
+      <div class="ctl-dock">
+      <div class="nf-actions"><button class="btn primary wide" id="bfPlay" type="button" data-autostart>연주 시작</button></div>
       <div class="bf-controls">
         <div class="bpm-row">
           <button type="button" data-bpm="-5">−5</button><button type="button" data-bpm="-1">−1</button>
@@ -76,6 +77,7 @@ export function mount(container, api) {
           <button type="button" data-bpm="1">+1</button><button type="button" data-bpm="5">+5</button>
         </div>
         <label class="check-row"><input type="checkbox" id="bfDiagLive" ${showDiagram ? "checked" : ""}> 운지 다이어그램 표시</label>
+      </div>
       </div>
       <p class="muted small nf-foot">이어폰·헤드폰을 쓰면 클릭 소리가 잘 들림. 일시정지하면 멈춘 코드부터 다시 준비 박을 세고 이어감</p>
     </div>`;

@@ -121,6 +121,7 @@ export function makePatternTask(kind) {
         <p class="small rh-tip" id="rhTip"></p>
         ${segHtml("rhMode", MODES, st.mode)}
         <div class="jam-state muted small" id="rhState">정지</div>
+        <div class="ctl-dock">
         <div class="nf-actions" style="margin-top:8px"><button class="btn primary wide" id="rhPlay" type="button" data-autostart>시작</button></div>
         <div class="btn-row" style="gap:8px;margin-top:8px">
           <button class="btn small" id="rhPrev" type="button">← 이전 패턴</button>
@@ -131,6 +132,7 @@ export function makePatternTask(kind) {
           <div class="bpm-val"><b id="rhBpm">${st.bpm}</b><span>BPM</span></div>
           <button type="button" data-bpm="1">+1</button><button type="button" data-bpm="5">+5</button>
         </div></div>
+        </div>
       </div>`;
     const $ = s => container.querySelector(s);
     const running = () => { const s = api.getActive(); return !!s && s.status === "running"; };

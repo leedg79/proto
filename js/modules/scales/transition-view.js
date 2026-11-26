@@ -67,12 +67,14 @@ export function mount(container, api) {
       <div class="sb-state"><span class="state-label" id="sbtCap">READY</span><span class="muted small" id="sbtInfo"></span></div>
       <div class="fretboard sb-board" id="sbtBoard"></div>
       <div class="beats bf-beats" id="sbtBeats">${[0, 1, 2, 3].map(i => `<span class="beat ${i === 0 ? "accent" : ""}"></span>`).join("")}</div>
+      <div class="ctl-dock">
       <div class="nf-actions" style="margin-top:12px"><button class="btn primary wide" id="sbtPlay" type="button" data-autostart>연주 시작</button></div>
       <div class="bf-controls"><div class="bpm-row">
         <button type="button" data-bpm="-5">−5</button><button type="button" data-bpm="-1">−1</button>
         <div class="bpm-val"><b id="sbtBpmVal">${st.bpm}</b><span>BPM</span></div>
         <button type="button" data-bpm="1">+1</button><button type="button" data-bpm="5">+5</button>
       </div></div>
+      </div>
       <p class="muted small nf-foot">파란 선 = 연주 경로, 주황 선 = 슬라이드로 다음 블록 넘어가기, 노랑 = 지금 칠 음, 초록 = 근음, 흐린 원 = 연결 블록의 나머지 음. 경로 칩을 누르면 그 경로부터 연습</p>
     </div>`;
   const $ = s => container.querySelector(s);

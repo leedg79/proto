@@ -51,9 +51,11 @@ export function mount(container, api) {
       </div>
       <div class="cycle-dots" id="stnDots"></div>
       <div class="timer-wrap"><div class="timer-track"><div id="stnBar"></div></div><div class="timer-text" id="stnTimer">0.0</div></div>
+      <div class="ctl-dock">
       <div class="nf-actions">
         <button class="btn primary wide" id="stnReveal" type="button">정답 확인</button>
         <button class="btn primary wide hidden" id="stnNext" type="button">다음 문제 →</button>
+      </div>
       </div>
       <div class="answer-area" id="stnAnswer"></div>
       <div class="field inline-time">

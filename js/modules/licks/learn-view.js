@@ -47,6 +47,7 @@ export function mount(container, api) {
     <div class="nf lk">
       <div class="nf-meta"><span id="lkNo"></span><span id="lkProg"></span></div>
       <div id="lkCard"></div>
+      <div class="ctl-dock">
       <div class="nf-actions lk-nav">
         <button class="btn" id="lkPrev" type="button">← 이전</button>
         <button class="btn primary" id="lkNext" type="button">다음 릭 →</button>
@@ -57,6 +58,7 @@ export function mount(container, api) {
         <button type="button" data-bpm="5">+5</button>
         <button type="button" class="btn small" id="lkMetro">메트로놈 켜기</button>
       </div></div>
+      </div>
       <p class="muted small nf-foot">듣기는 아래 BPM으로 재생. TAB 위 숫자 = 프렛, 초록 화살표 = 벤딩, 보라 호 = 해머온·풀오프, 주황 선 = 슬라이드, ∿ = 비브라토, 주황 숫자 = 경과음</p>
     </div>`;
   const $ = s => container.querySelector(s);
