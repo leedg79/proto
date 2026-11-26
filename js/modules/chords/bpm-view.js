@@ -1,7 +1,7 @@
 // 연속 코드 찾기(Sequential Chord Finding) 화면: 메트로놈에 맞춰 2박마다 코드가 바뀜, 다음 코드 미리보기
 
 import * as B from "./bpm-core.js";
-import { answersOf, describe } from "./prompts.js";
+import { answersOf, describe, evalTarget } from "./prompts.js";
 import { rankVoicings } from "../../theory/voicings.js";
 import { chordBoxSvg } from "../../render/chordbox.js";
 import { getSetting, setSetting } from "../../core/storage.js";
@@ -128,6 +128,8 @@ export function mount(container, api) {
     if (info.phase === "chord" && info.chordStart) {
       const r = B.advance(st, info);
       st = r.state;
+      // 연주 평가: 코드가 바뀌는 박마다 앞 코드를 마감하고 지금 코드로 판정(수행시간 = 코드 시작 박부터 구성음이 들릴 때까지)
+      if (api.eval) api.eval.prompt(evalTarget(st.seq[st.pos]));
       persist();
       if (r.completedUnit) {
         api.addUnit(1);
@@ -158,6 +160,7 @@ export function mount(container, api) {
 
   function stop() {
     if (playing) Metro.stopMetronome();
+    if (playing && api.eval) api.eval.end();
     playing = false;
     view = { phase: "idle", countLeft: 0, inBar: -1 };
     $("#bfPlay").textContent = "연주 시작";

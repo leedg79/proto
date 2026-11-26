@@ -10,6 +10,7 @@ import { TUNING } from "../../theory/notes.js";
 import { startBacking, stopBacking, setBackingBpm, isBackingRunning, setPartLevel } from "../../audio/backing-player.js";
 import { getSetting, setSetting } from "../../core/storage.js";
 import { keyPickerHtml, bindPicker, readSel, segHtml, makeStore, pickKey } from "./common.js";
+import { scaleTarget } from "../../eval/targets.js";
 
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const store = makeStore("fretlab:cs1");
@@ -103,6 +104,8 @@ export function mount(container, api) {
             }
           }
           $("#csState").textContent = `${b + 1}마디`;
+          // 연주 평가: 마디마다 친 음이 지금 코드의 스케일 안인지(즉흥이라 모든 음을 칠 필요는 없음)
+          if (api.eval) { const x = plan.bars[b]; api.eval.prompt({ ...scaleTarget(`${b + 1}마디 ${x.name} · ${keyName(x.scaleRoot, x.scaleId)} ${scaleNameOf(x.scaleId)}`, x.scaleRoot, x.scaleId), cover: false }); }
           draw();
         },
         onBeat: (bb, counting, left) => { if (counting) $("#csState").textContent = `준비 ${left}`; }
@@ -111,7 +114,7 @@ export function mount(container, api) {
       playing = true; $("#csPlay").textContent = "멈춤"; draw();
     } catch (e) { api.toast("소리를 켤 수 없음: " + e.message); $("#csPlay").textContent = "반주 시작"; }
   }
-  function stop() { stopBacking(); playing = false; bar = 0; $("#csPlay").textContent = "반주 시작"; $("#csState").textContent = "정지"; draw(); }
+  function stop() { stopBacking(); if (playing && api.eval) api.eval.end(); playing = false; bar = 0; $("#csPlay").textContent = "반주 시작"; $("#csState").textContent = "정지"; draw(); }
   $("#csPlay").onclick = () => (isBackingRunning() ? stop() : play());
   $("#csHintLive").onclick = e => { const b = e.target.closest("[data-v]"); if (!b) return; st = { ...st, hint: b.dataset.v }; persist(); container.querySelectorAll("#csHintLive button").forEach(x => x.classList.toggle("sel", x === b)); draw(); };
   container.querySelector(".bf-controls").addEventListener("click", e => {

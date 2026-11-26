@@ -8,6 +8,7 @@ import { scaleBoardSvg } from "../../render/scaleboard.js";
 import { getSetting, setSetting } from "../../core/storage.js";
 import { esc, keyPickerHtml, bindPicker, readSel, segHtml, makeStore, pickKey } from "./common.js";
 import { regionTimeHtml, bindRegionTime, readRegionTime } from "./prompt-drill.js";
+import { seqTarget } from "../../eval/targets.js";
 
 const store = makeStore("fretlab:stn2");
 export const clearFinder = () => store.clear();
@@ -70,10 +71,17 @@ export function mount(container, api) {
     if (index + 1 >= deck.length) { cycleNo++; deck = newDeck(cycleNo); index = -1; done = 0; }
     index++;
     st = { ...st, deck, index, done, cycleNo, promptNo: st.promptNo + 1, current: { start: api.elapsedMs(), revealed: false, timedOut: false } };
-    persist(); draw();
+    persist(); draw(); evalPrompt();
+  }
+  // 연주 평가: 시작음부터 한 옥타브 왕복을 순서대로 쳤는지(틀린 위치 기록, 수행시간 = 첫 음~끝 음)
+  function evalPrompt() {
+    const p = st.deck[Math.max(0, st.index)];
+    if (!api.eval || !p || !st.current || st.current.revealed) return;
+    api.eval.prompt(seqTarget(`${scaleTitle(p.rootPc, p.scaleId)} · ${p.s}번 줄 ${p.noteName}`, p.notes));
   }
   function doReveal(timedOut) {
     if (!st.current || st.current.revealed) return;
+    if (api.eval) api.eval.end();
     const done = st.done + 1;
     const complete = done >= st.deck.length;
     st = { ...st, done, units: st.units + (complete ? 1 : 0), current: { ...st.current, revealed: true, timedOut } };
@@ -137,5 +145,6 @@ export function mount(container, api) {
   };
   draw(); tick();
   const timer = setInterval(tick, 100);
-  return () => clearInterval(timer);
+  evalPrompt();
+  return () => { clearInterval(timer); if (api.eval) api.eval.end(); };
 }

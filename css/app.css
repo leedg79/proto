@@ -646,3 +646,14 @@ h1, h2, h3 { margin: 0; line-height: 1.25; }
 .ear-verdict.ok { color: #a6f06a; } .ear-verdict.ng { color: #ff9a6a; }
 .ear-rhy { display: grid; gap: 8px; }
 .ear-rh { background: transparent; border: 1px solid #263244; border-radius: 10px; padding: 4px; }
+
+/* 연주 평가(마이크) */
+.eval-panel h3 small { font-weight: 400; font-size: 12px; }
+.eval-meter { height: 6px; background: #1a2230; border-radius: 4px; overflow: hidden; margin: 8px 0; }
+.eval-meter i { display: block; height: 100%; width: 0; background: #4fc3a1; transition: width .1s; }
+.eval-last { min-height: 20px; font-size: 14px; margin: 6px 0; line-height: 1.4; }
+.eval-last.ok { color: #4fc3a1; }
+.eval-last.bad { color: #ff8a65; }
+.eval-log { margin: 6px 0 0; padding-left: 20px; max-height: 260px; overflow: auto; }
+.eval-log li.ok { color: #9fe0c9; }
+.eval-log li.bad { color: #ffb59c; }

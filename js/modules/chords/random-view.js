@@ -1,7 +1,7 @@
 // Random Chord Finding 화면: 문제 카드 → 제한시간 → 정답 확인 → 가능한 운지 전부 → 다음 문제
 
 import * as R from "./random-core.js";
-import { answersOf, describe } from "./prompts.js";
+import { answersOf, describe, evalTarget } from "./prompts.js";
 import { chordGrid } from "../../render/chordbox.js";
 import { rankVoicings } from "../../theory/voicings.js";
 import { getSetting, setSetting } from "../../core/storage.js";
@@ -68,16 +68,20 @@ export function mount(container, api) {
   const running = () => { const s = api.getActive(); return !!s && s.status === "running"; };
   const persist = () => save(s0.id, st);
 
+  const ev = api.eval;
+  const evalPrompt = () => { if (ev && st.current && !st.current.revealed) ev.prompt(evalTarget(st.current.spec)); };
   function next() {
     if (!running()) return;
     st = R.next(st, api.elapsedMs());
     persist();
     draw();
+    evalPrompt();
   }
 
   function doReveal(timedOut) {
     const r = R.reveal(st, { timedOut });
     if (r.state === st) return;
+    if (ev) ev.end();
     st = r.state;
     persist();
     if (r.completedUnit) { api.addUnit(1); api.toast(`12문제 완료 · 이번 세션 ${st.decksDone}회`); }
@@ -141,7 +145,8 @@ export function mount(container, api) {
   };
 
   draw();
+  evalPrompt();
   tick();
   const timer = setInterval(tick, 100);
-  return () => clearInterval(timer);
+  return () => { clearInterval(timer); if (ev) ev.end(); };
 }

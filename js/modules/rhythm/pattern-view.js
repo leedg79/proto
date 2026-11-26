@@ -12,6 +12,7 @@ import { progVoicings } from "../chords/comping-core.js";
 import { keyName } from "../../theory/scales.js";
 import { getSetting, setSetting } from "../../core/storage.js";
 import { esc, segHtml, bindPicker, readSel, keyPickerHtml, makeStore, pickKey } from "../scales/common.js";
+import { timingTarget, beatLabel } from "../../eval/targets.js";
 
 export const MODES = [["listen", "시범 듣기"], ["along", "같이 치기"], ["solo", "혼자 치기"]];
 const MODE_LEVEL = { listen: 0.9, along: 0.28, solo: 0 };
@@ -215,6 +216,9 @@ export function makePatternTask(kind) {
         }
       }
       $("#rhState").textContent = `${b + 1}마디 · ${nameAt(b)}`;
+      // 연주 평가: 마디마다 어택이 패턴의 칸에 맞았는지(듣기 모드는 평가하지 않음)
+      if (playing && st.mode !== "listen" && api.eval) api.eval.prompt(timingTarget(`${p.name} · ${b + 1}마디`));
+      else if (playing && api.eval) api.eval.info("듣기 모드는 평가하지 않음 · 같이 치기·혼자 치기에서 평가");
       drawProg();
       if (kind === "finger" || p.bars > 1 || chords.length > 1) drawScore();
       drawChords();
@@ -233,14 +237,15 @@ export function makePatternTask(kind) {
           backing, noBass: kind !== "comp" && st.back === "drums", inst: p.opts.inst || info.inst,
           barEvents: b => R.barEvents(p, b, vAt(b), vAt(b + 1)),
           onCount: left => { $("#rhState").textContent = `준비 ${left}`; },
-          onBar, onStep
+          onBar, onStep,
+          onSchedule: (e, b, loop, t) => { if (st.mode !== "listen" && api.eval) api.eval.expect(beatLabel(e.at, b), t); }
         });
         setRhythmLevel("guitar", MODE_LEVEL[st.mode]);
         playing = true; $("#rhPlay").textContent = "멈춤";
       } catch (e) { api.toast("소리를 켤 수 없음: " + e.message); $("#rhPlay").textContent = "시작"; }
     }
     function stop() {
-      stopRhythm(); playing = false; bar = -1; counted = 0;
+      stopRhythm(); if (playing && api.eval) api.eval.end(); playing = false; bar = -1; counted = 0;
       $("#rhPlay").textContent = "시작"; $("#rhState").textContent = "정지";
       container.querySelectorAll(".rg-c.now").forEach(x => x.classList.remove("now"));
       lastOn.forEach(x => x.classList.remove("on")); lastOn = [];

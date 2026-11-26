@@ -14,6 +14,8 @@ import { startBacking, stopBacking, isBackingRunning, setBackingBpm, preload } f
 import { KEY_LIST, keyName } from "../../theory/scales.js";
 import { getSetting, setSetting } from "../../core/storage.js";
 import { segHtml, bindPicker, readSel, makeStore } from "../scales/common.js";
+import { lickSeq, pcsTarget, followTarget, midiAt } from "../../eval/targets.js";
+import { SCALES } from "../../theory/scales.js";
 
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const FLATS = [5, 10, 3, 8, 1, 6];
@@ -82,10 +84,24 @@ function promptTask({ p, storeKey, kind }) {
         let { deck, idx, done } = st;
         if (idx + 1 >= deck.length) { deck = makeDeck(); idx = -1; done = 0; }
         st = { ...st, deck, idx: idx + 1, done, cur: { start: api.elapsedMs(), revealed: false } };
-        persist(); draw();
+        persist(); draw(); evalPrompt();
+      }
+      // 연주 평가: 옮기기 = 옮긴 릭의 음을 순서대로(옥타브 무관), 변형 = 릭의 스케일 안에서 쳤는지
+      function evalPrompt() {
+        const it = item();
+        if (!api.eval || !it || !st.cur || st.cur.revealed) return;
+        const l = LICKS.find(x => x.id === it.id), r = realize(l);
+        if (kind === "move") {
+          const t = moveTo(r, it.key, it.region);
+          api.eval.prompt({ ...lickSeq(`${l.id} → ${keyName(it.key, "major")} 키`, t.events, true), repeat: true });
+        } else {
+          const pcs = SCALES[r.scale] ? SCALES[r.scale].steps.map(x => r.key + x) : r.notes.map(n => n.midi);
+          api.eval.prompt({ ...pcsTarget(`${l.id} 변형 · ${VARIATIONS[it.type].split(":")[0]}`, pcs), cover: false });
+        }
       }
       function reveal(timedOut) {
         if (!st.cur || st.cur.revealed) return;
+        if (api.eval) api.eval.end();
         const done = st.done + 1, complete = done >= st.deck.length;
         st = { ...st, done, units: st.units + (complete ? 1 : 0), cur: { ...st.cur, revealed: true, timedOut } };
         persist();
@@ -136,9 +152,9 @@ function promptTask({ p, storeKey, kind }) {
       };
       $("#apReveal").onclick = () => reveal(false);
       $("#apNext").onclick = () => { stopLick(); next(); };
-      draw(); tick();
+      draw(); tick(); evalPrompt();
       const timer = setInterval(tick, 100);
-      return () => { clearInterval(timer); unplay(); stopLick(); };
+      return () => { clearInterval(timer); unplay(); stopLick(); if (api.eval) api.eval.end(); };
     }
   };
 }
@@ -203,6 +219,12 @@ export const LickBacking = {
           custom: plan.custom, style: plan.style, key: r.key, bpm: st.bpm,
           onBarTime: (bar, loop, time) => {
             if (bar === 0) playLick(r, st.bpm, { startAt: time, keep: true, onEvent: i => { const el = container.querySelector("#lbCard [data-score]"); if (el && i >= 0) paintScore(el, LICKS.find(x => x.id === r.id), i); } });
+            // 연주 평가: 응답 차례(뒤 절반)에 같은 릭을 제때·맞는 음으로 쳤는지
+            if (bar === plan.bars && api.eval) {
+              api.eval.prompt(followTarget(`${r.id} 응답`));
+              const spb = 60 / st.bpm;
+              r.events.forEach((e, i) => { if (e.notes && e.notes.length) api.eval.expect(`${i + 1}번째 음`, time + (e.at / 12) * spb, { midis: [...e.notes.map(n => midiAt(n.s, n.f)), ...Array.from({ length: Math.ceil(e.bend || 0) }, (_, k) => midiAt(e.notes[0].s, e.notes[0].f) + k + 1)] }); });
+            }
           },
           onBar: (bar, loop) => {
             const half = plan.bars;
@@ -215,7 +237,7 @@ export const LickBacking = {
         playing = true; $("#lbPlay").textContent = "멈춤";
       } catch (e) { api.toast("소리를 켤 수 없음: " + e.message); $("#lbPlay").textContent = "반주 시작"; }
     }
-    function stop() { stopBacking(); stopLick(); playing = false; setPhase(""); $("#lbPlay").textContent = "반주 시작"; $("#lbState").textContent = "정지"; }
+    function stop() { stopBacking(); stopLick(); if (playing && api.eval) api.eval.end(); playing = false; setPhase(""); $("#lbPlay").textContent = "반주 시작"; $("#lbState").textContent = "정지"; }
     function advance() {
       stop();
       const done = st.done + 1, complete = done % 4 === 0;

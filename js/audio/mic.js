@@ -95,6 +95,8 @@ export function setMonitor(on, level = 0.8) {
 export const micInfo = () => (mic ? { label: mic.label, deviceId: mic.deviceId, kind: inputKind(mic.label), monitor: !!mic.monitor } : null);
 
 export function listen(handler) { if (!mic) return () => {}; mic.handlers.add(handler); return () => mic && mic.handlers.delete(handler); }
+export const micHandle = () => mic;
+export const listenerCount = () => (mic ? mic.handlers.size : 0);
 export const micLevel = () => (mic ? mic.level : 0);
 export const isMicOpen = () => !!mic;
 

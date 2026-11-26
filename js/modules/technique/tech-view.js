@@ -247,6 +247,12 @@ export function makeTechTask(level) {
           last: { id: x.id, bpm, pass: res.pass, hitRate: res.hitRate, hits: res.hits, required: res.required, misses: res.misses, extras: res.extras, allowedExtras: res.allowedExtras, meanMs: res.meanMs, signedMs: res.signedMs, within: res.within, grades: T.gradeByIndex(res), next } };
         if (res.pass && st.passes % PASSES_PER_UNIT === 0) { st.units += 1; api.addUnit(1); api.toast(`통과 ${PASSES_PER_UNIT}회 · 완료 ${st.units}회`); }
         persist();
+        // 연주 평가 기록: 박자 판정 결과를 그대로 넣음(정확도 = 맞춘 어택 비율, 실수 = 놓친·벗어난 음 번호와 불필요한 어택)
+        if (api.eval) {
+          const g = T.gradeByIndex(res);
+          const bad = Object.entries(g).filter(([, v]) => v === "miss" || v === "off").map(([i, v]) => `${Number(i) + 1}번째 음 ${v === "miss" ? "놓침" : "박자 벗어남"}`);
+          api.eval.report({ label: `${x.name} · ${bpm} BPM`, kind: "timing", ok: res.pass, score: res.required ? res.hits / (res.required + res.extras) : 0, timeMs: null, meanMs: res.meanMs != null ? Math.round(res.meanMs) : null, mistakes: [...bad, ...(res.extras ? [`불필요한 어택 ${res.extras}회`] : [])] });
+        }
         setState(res.pass ? "통과" : "다시");
         drawAll();
       } finally { busy = false; $("#tqJudge").disabled = false; }
@@ -319,7 +325,7 @@ export function makeTechTask(level) {
     });
     load(); drawAll(); persist();
     if (window.__fretlabTechInject) setMic("시험용 입력");
-    return () => { stopLick(); stopFns.forEach(f => f()); if (meterTimer) clearInterval(meterTimer); closeMic(); };
+    return () => { stopLick(); stopFns.forEach(f => f()); if (meterTimer) clearInterval(meterTimer); if (!(api.eval && api.eval.isOn())) closeMic(); };
   }
 
   return { settingsHtml, bindSettings, readSettings, mount, clearFinder: () => store.clear() };

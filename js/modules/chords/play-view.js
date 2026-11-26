@@ -6,6 +6,7 @@ import { sheetHtml, sheetSvg, savePng } from "../../render/chordsheet.js";
 import { getSetting, setSetting } from "../../core/storage.js";
 import { topicName } from "../../data/catalog.js";
 import * as Metro from "../../audio/metronome.js";
+import { voicingTarget } from "../../eval/targets.js";
 
 const KEY = "fretlab:play";
 const BPM_MIN = 40, BPM_MAX = 160, BPM_DEFAULT = 80;
@@ -165,6 +166,9 @@ export function mount(container, api) {
         st = { ...st, bar: p.barIdx, played };
         persist();
       }
+      // 연주 평가: 코드가 바뀔 때마다 지금 코드(화면 운지의 구성음)로 판정
+      const c = chordAt(p.barIdx, p.chordIdx);
+      if (api.eval && c && c.voicing) api.eval.prompt(voicingTarget(`${p.barIdx + 1}마디 ${c.name}`, c.voicing.notes));
       drawChord();
     }
     drawBeat();
@@ -184,6 +188,7 @@ export function mount(container, api) {
 
   function stop() {
     if (playing) Metro.stopMetronome();
+    if (playing && api.eval) api.eval.end();
     playing = false;
     inBarBeat = -1;
     if (pos.phase !== "play") pos = { phase: "idle", barIdx: st.bar, chordIdx: 0 };

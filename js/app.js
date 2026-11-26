@@ -34,8 +34,11 @@ import * as RhythmReading from "./modules/rhythm/reading-view.js";
 import * as RhythmPhrase from "./modules/rhythm/phrase-view.js";
 import { strum, loadInstrument } from "./audio/sampler.js";
 import { unlockAudio } from "./audio/context.js";
+import * as Ev from "./eval/evaluator.js";
+import { micLevel } from "./audio/mic.js";
+import { summary as evalSummary, summaryText as evalText } from "./eval/eval-core.js";
 
-const APP_VERSION = "2.6.0";
+const APP_VERSION = "2.7.0";
 
 // 구현된 과제의 연습 화면 (모듈/과제 → 화면 모듈)
 // 화면 모듈: settingsHtml, bindSettings, readSettings, mount, clearFinder
@@ -447,6 +450,35 @@ function renderTask(modId, lvlId, taskId) {
 }
 
 // ───────────── 진행 중 세션 화면 ─────────────
+// 연주 평가를 붙일 수 있는 모듈(Notes ~ Technique)
+const EVAL_MODULES = ["notes", "chords", "rhythm", "scales", "licks", "technique"];
+
+function bindEvalPanel() {
+  const sw = $("#evalSwitch");
+  const draw = () => { sw.textContent = Ev.isOn() ? "ON" : "OFF"; sw.classList.toggle("on", Ev.isOn()); };
+  const off = Ev.onChange(({ text, kind }) => {
+    const el = $("#evalLast"); if (!el) return;
+    el.textContent = text; el.className = "eval-last " + (kind || "");
+  });
+  onCleanup(off);
+  sw.onclick = async () => {
+    if (Ev.isOn()) { Ev.disable(); Store.setSetting("eval.on", false); draw(); return; }
+    try {
+      if (window.__fretlabEvalFake) Ev._test.enableFake(); else await Ev.enable();
+      Store.setSetting("eval.on", true);
+      $("#evalHeard").textContent = window.__fretlabEvalFake ? "테스트 입력" : `입력: ${Ev.inputLabel()}`;
+    } catch (e) { toast("마이크를 켤 수 없음: " + (e.message || e.name)); }
+    draw();
+  };
+  const t = setInterval(() => {
+    const h = Ev.heard();
+    if (Ev.isOn() && h) $("#evalHeard").textContent = `들린 음 ${h.name}`;
+    const m = $("#evalMeter"); if (m) m.style.width = Ev.isOn() ? Math.min(100, Math.sqrt(micLevel()) * 2500) + "%" : "0%";
+  }, 120);
+  onCleanup(() => clearInterval(t));
+  draw();
+}
+
 function renderSession() {
   const s0 = S.getActive();
   if (!s0) { go("", { replace: true }); return null; }
@@ -476,6 +508,15 @@ function renderSession() {
             <div class="seg" id="beatSeg">${[2, 3, 4, 6].map(n => `<button type="button" data-beats="${n}" class="${n === metro.beats ? "sel" : ""}">${n}/4</button>`).join("")}</div>
           </div>
         </div>`;
+  const evalable = !!content && EVAL_MODULES.includes(s0.module);
+  const evalPanel = evalable ? `
+        <div class="panel eval-panel" id="evalPanel">
+          <div class="metro-top"><h3>연주 평가 <small class="muted">마이크</small></h3><button class="switch" id="evalSwitch" type="button">OFF</button></div>
+          <div class="eval-meter"><i id="evalMeter"></i></div>
+          <div class="eval-heard muted small" id="evalHeard">켜면 마이크(또는 고른 입력 장치)로 연주를 듣고 문제마다 판정함</div>
+          <div class="eval-last" id="evalLast"></div>
+          <div class="eval-sum muted small" id="evalSum"></div>
+        </div>` : "";
   const tagsHtml = s => `<span class="tag accent">${esc(SESSION_TYPES[s.type] || s.type)}</span>${(s.topics || []).map(id => `<span class="tag">${esc(topicLabel(s.module, s.level, s.task, [id]))}</span>`).join("")}`;
   const head = `
       <div class="panel session-head span-all">
@@ -508,7 +549,7 @@ function renderSession() {
       ${live}
       ${gate}
       <div class="panel content-panel" id="contentArea"></div>
-      <div style="display:grid;gap:12px;align-content:start">${unitsPanel}</div>
+      <div style="display:grid;gap:12px;align-content:start">${unitsPanel}${evalPanel}</div>
     </div>` : `
     <div class="session-layout">
       ${head}
@@ -537,7 +578,7 @@ function renderSession() {
 
   // 연습 화면 붙이기·다시 붙이기
   let unmount = null;
-  const api = { getActive: S.getActive, elapsedMs: S.elapsedMs, addUnit: n => S.addCompletedUnit(n), toast };
+  const api = { getActive: S.getActive, elapsedMs: S.elapsedMs, addUnit: n => S.addCompletedUnit(n), toast, eval: Ev };
   const mountContent = () => {
     if (!content) return;
     if (unmount) { try { unmount(); } catch (_) {} }
@@ -546,8 +587,11 @@ function renderSession() {
   };
   // 반주·연주형 과제는 "연습 시작"과 함께 재생 시작 (자동 시험에서는 window.__fretlabNoAutostart로 끔)
   const autostart = () => { if (window.__fretlabNoAutostart) return; const b = $("#contentArea [data-autostart]"); if (b) b.click(); };
+  Ev.setSink(r => S.recordEval(r));
   mountContent();
   onCleanup(() => { if (unmount) try { unmount(); } catch (_) {} });
+  if (evalable) bindEvalPanel();
+  onCleanup(() => { if (Ev.isOn()) Ev.disable(); Ev.end(); });
 
   if (content) {
     content.bindSettings($("#liveForm"));
@@ -598,6 +642,7 @@ function renderSession() {
     $("#gate").classList.toggle("hidden", !ready);
     if ($("#contentArea")) $("#contentArea").classList.toggle("hidden", ready);
     $("#unitCount").textContent = s.completedUnits;
+    if ($("#evalSum")) $("#evalSum").textContent = Ev.isOn() || s.eval ? evalText(evalSummary(s.eval)) : "";
     if (!hasMetro) return;
     const sw = $("#metroSwitch");
     sw.textContent = metro.on ? "ON" : "OFF";
@@ -686,6 +731,24 @@ function renderSession() {
 }
 
 // ───────────── 종료 결과 ─────────────
+function evalHtml(r) {
+  const sm = evalSummary(r.eval);
+  if (!sm) return "";
+  return `
+      <div class="panel eval-result" style="margin-top:16px">
+        <h3 style="margin:0 0 10px">연주 평가</h3>
+        <div class="result-grid">
+          <div class="stat"><div class="k">평가 횟수</div><div class="v">${sm.attempts}회</div></div>
+          <div class="stat"><div class="k">정확도</div><div class="v">${sm.accuracy}%</div></div>
+          <div class="stat"><div class="k">${sm.avgTimeMs != null ? "평균 수행시간" : "박자 오차 평균"}</div><div class="v">${sm.avgTimeMs != null ? (sm.avgTimeMs / 1000).toFixed(1) + "초" : sm.avgOffsetMs != null ? sm.avgOffsetMs + "ms" : "-"}</div></div>
+          <div class="stat"><div class="k">실수</div><div class="v">${sm.mistakes}회</div></div>
+        </div>
+        ${sm.top.length ? `<p class="muted small" style="margin:10px 0 0">자주 틀린 곳: ${sm.top.map(x => `${esc(x.label)} ${x.n}회`).join(", ")}</p>` : ""}
+        <details style="margin-top:8px"><summary class="small">문제별 기록 ${r.eval.log.length}건</summary>
+          <ol class="eval-log small">${r.eval.log.map(x => `<li class="${x.ok ? "ok" : "bad"}">${esc(x.l)} · ${x.s}%${x.t != null ? ` · ${(x.t / 1000).toFixed(1)}초` : ""}${x.m.length ? ` · ${esc(x.m.join(", "))}` : ""}</li>`).join("")}</ol></details>
+      </div>`;
+}
+
 function renderDone(id) {
   view.innerHTML = `<div class="empty-state">기록을 불러오는 중</div>`;
   Store.getAllSessions().then(list => {
@@ -701,6 +764,7 @@ function renderDone(id) {
         <div class="stat"><div class="k">일시정지</div><div class="v">${r.pauses.length}회</div></div>
         <div class="stat"><div class="k">일시정지 시간</div><div class="v">${formatDuration(pauseSec)}</div></div>
       </div>
+      ${evalHtml(r)}
       <div class="btn-row" style="margin-top:16px">
         <button class="btn primary" type="button" id="again">같은 과제 다시</button>
         <button class="btn" type="button" id="toDay">오늘 학습일지</button>
@@ -878,6 +942,7 @@ function logItem(r) {
         <dt>실제 연습</dt><dd>${formatDuration(r.activeSec)} (${r.activeSec}초)</dd>
         <dt>일시정지</dt><dd>${r.pauses.length}회 · ${formatDuration(pauseSec)}${r.pauses.length ? `<br><span class="muted small">${r.pauses.map(p => `${hm(p.from)}~${hm(p.to)} ${reasons[p.reason] || p.reason}`).join(", ")}</span>` : ""}</dd>
         <dt>완료 횟수</dt><dd>${r.completedUnits}회</dd>
+        ${r.eval ? `<dt>연주 평가</dt><dd>${esc(evalText(evalSummary(r.eval)))}${evalSummary(r.eval).top.length ? `<br><span class="muted small">자주 틀린 곳: ${evalSummary(r.eval).top.map(x => `${esc(x.label)} ${x.n}회`).join(", ")}</span>` : ""}</dd>` : ""}
         ${r.options && r.options.timeLimit ? `<dt>설정</dt><dd>제한시간 ${r.options.timeLimit}초</dd>` : ""}
         ${r.options && r.options.bpm ? `<dt>설정</dt><dd>${r.options.style ? `${esc((PLAY_KEYS.find(k => k.pc === r.options.key) || {}).name || "")} 장조 · ${esc((PLAY_STYLES[r.options.style] || {}).name || r.options.style)} · ` : ""}시작 BPM ${r.options.bpm}</dd>` : ""}
       </dl>

@@ -9,6 +9,7 @@ import { scaleBoardSvg } from "../../render/scaleboard.js";
 import { setSetting } from "../../core/storage.js";
 import * as Metro from "../../audio/metronome.js";
 import { esc, makeStore } from "./common.js";
+import { seqTarget } from "../../eval/targets.js";
 
 export const HINTS = [["all", "전체 음 보며"], ["root", "근음만 보고"], ["hide", "이름만 보고"]];
 export const hintOk = v => (["all", "root", "hide"].includes(v) ? v : "all");
@@ -117,6 +118,12 @@ export function mountSegPlayer(container, api, opts) {
       kShift = kAbs - BC.COUNT_IN * perBeat;
       cur = slotAt(plan, 0, BC.COUNT_IN * perBeat);
     }
+    if (cur.phase === "play" && cur.slot && cur.slot.note >= 0 && api.eval && evSeg !== `${st.cycleNo}:${cur.slot.seg}`) {
+      // 연주 평가: 구간이 바뀔 때마다 그 구간의 음을 순서대로 쳤는지
+      evSeg = `${st.cycleNo}:${cur.slot.seg}`;
+      const sg = built.segments[cur.slot.seg];
+      api.eval.prompt(seqTarget(`${built.title || ""} ${sg.chip || ""}`.trim(), sg.notes));
+    }
     if (cur.phase === "play") {
       // 재개 시 지금 구간 처음부터
       const ss = plan.segStart[cur.slot.seg];
@@ -124,6 +131,7 @@ export function mountSegPlayer(container, api, opts) {
     }
     draw(); drawCap(inBar);
   }
+  let evSeg = null;
   function onBeat(inBar, beat) {
     if (!playing) return;
     step(beat * perBeat, inBar);
@@ -142,6 +150,8 @@ export function mountSegPlayer(container, api, opts) {
   }
   function stop() {
     if (playing) Metro.stopMetronome();
+    if (playing && api.eval) api.eval.end();
+    evSeg = null;
     clearTimeout(half);
     playing = false; cur = null;
     $("#spPlay").textContent = "연주 시작";

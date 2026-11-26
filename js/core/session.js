@@ -5,6 +5,7 @@
 //   완료 1회 이상이면 기록, 아니면 기록하지 않음
 
 import * as C from "./clock.js";
+import { addRecord } from "../eval/eval-core.js";
 import { loadActive, saveActive, putSession } from "./storage.js";
 
 const HEARTBEAT_MS = 5000;
@@ -150,6 +151,11 @@ export function resumeSession() {
 export function addCompletedUnit(n = 1) {
   if (!state) return;
   commit(C.addUnit(state, n));
+}
+
+export function recordEval(r) {
+  if (!state) return;
+  commit(C.addEval(state, r, addRecord));
 }
 
 export async function endSession() {

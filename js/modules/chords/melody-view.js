@@ -6,6 +6,7 @@ import { scoreSvg } from "../../render/score.js";
 import { playLick, stopLick } from "../../audio/lick-player.js";
 import { getSetting, setSetting } from "../../core/storage.js";
 import { segHtml, bindPicker, readSel, makeStore } from "../scales/common.js";
+import { followTarget, midiAt } from "../../eval/targets.js";
 
 const store = makeStore("fretlab:cm1");
 export const clearFinder = () => store.clear();
@@ -59,19 +60,23 @@ export function mount(container, api) {
     $("#cmListen").textContent = mode === "listen" ? "■ 멈춤" : "▶ 듣기";
     $("#cmFollow").textContent = mode === "follow" ? "■ 멈춤" : "따라 치기";
   }
-  function stop() { stopLick(); mode = null; draw(); }
+  function stop() { stopLick(); if (mode === "follow" && api.eval) api.eval.end(); mode = null; draw(); }
   async function run(m) {
     if (mode) { const was = mode; stop(); if (was === m) return; }
     if (m === "follow" && !running()) { api.toast("세션을 재개한 뒤 따라 칠 수 있음"); return; }
     mode = m; draw();
+    // 연주 평가: 따라 치기에서 음마다 제때 멜로디(맨 위 음)를 쳤는지
+    if (m === "follow" && api.eval) api.eval.prompt(followTarget(song.name));
     try {
       await playLick({ events: song.events, ticks: song.ticks, feel: "straight" }, st.bpm, {
         countIn: 4, click: m === "follow", silent: m === "follow",
         onEvent: i => {
           if (i === -1) {
             if (mode === "follow" && running()) { st = { ...st, units: st.units + 1 }; persist(); api.addUnit(1); api.toast(`${song.name} 끝까지 연주 · 이번 세션 ${st.units}회`); }
+            if (mode === "follow" && api.eval) api.eval.end();
             mode = null; draw(); return;
           }
+          if (mode === "follow" && api.eval) { const ev = song.events[i]; const top = ev && ev.notes && ev.notes[0]; if (top) api.eval.expect(`${i + 1}번째 음`, null, { midis: [midiAt(top.s, top.f)] }); }
           paint(i);
         }
       });

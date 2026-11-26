@@ -7,6 +7,7 @@ import { startRhythm, stopRhythm, setRhythmLevel, setRhythmBpm } from "../../aud
 import { getSetting, setSetting } from "../../core/storage.js";
 import { segHtml, bindPicker, readSel, makeStore } from "../scales/common.js";
 import { gridHtml } from "./pattern-view.js";
+import { timingTarget, beatLabel } from "../../eval/targets.js";
 
 const store = makeStore("fretlab:rhr1");
 export const clearFinder = () => store.clear();
@@ -103,6 +104,8 @@ export function mount(container, api) {
     if (!running()) { api.toast("세션을 재개한 뒤 시작할 수 있음"); return; }
     const p = st.cur;
     $("#rrState").textContent = "음원 불러오는 중…";
+    // 연주 평가: 직접 쳐 보기 2번 반복 전체의 어택이 악보 칸에 맞았는지
+    if (!demo && api.eval) api.eval.prompt(timingTarget(`읽기 ${st.no}번`));
     try {
       await startRhythm({
         bpm: st.bpm, loopBars: p.bars, countIn: 4, swing: !!p.opts.swing, grid: p.grid, click: true, maxLoops: demo ? 1 : 2,
@@ -110,20 +113,21 @@ export function mount(container, api) {
         onCount: left => { $("#rrState").textContent = `준비 ${left}`; },
         onBar: (b, loop) => { $("#rrState").textContent = demo ? "정답 소리" : `${loop + 1}/2번째 · ${b + 1}마디`; },
         onStep,
-        onEnd: () => { clearMarks(); $("#rrState").textContent = demo ? "다음 문제로 넘어가거나 다시 쳐 봄" : "다 쳤으면 정답 듣기"; }
+        onSchedule: (e, b, loop, t) => { if (!demo && api.eval) api.eval.expect(beatLabel(e.at, b), t); },
+        onEnd: () => { if (!demo && api.eval) api.eval.end(); clearMarks(); $("#rrState").textContent = demo ? "다음 문제로 넘어가거나 다시 쳐 봄" : "다 쳤으면 정답 듣기"; }
       });
       setRhythmLevel("guitar", demo ? 0.9 : 0);
     } catch (e) { api.toast("소리를 켤 수 없음: " + e.message); $("#rrState").textContent = ""; }
   }
-  $("#rrTry").onclick = () => { stopRhythm(); clearMarks(); run(false); };
+  $("#rrTry").onclick = () => { stopRhythm(); if (api.eval) api.eval.end(); clearMarks(); run(false); };
   $("#rrReveal").onclick = () => {
-    stopRhythm(); clearMarks();
+    stopRhythm(); if (api.eval) api.eval.end(); clearMarks();
     st = { ...st, phase: "revealed", done: st.done + 1 };
     if (st.done % PER_UNIT === 0) { st.units += 1; api.addUnit(1); api.toast(`${PER_UNIT}문제 완료 · 이번 세션 ${st.units}회`); }
     persist(); draw(); run(true);
   };
   $("#rrNext").onclick = () => {
-    stopRhythm(); clearMarks();
+    stopRhythm(); if (api.eval) api.eval.end(); clearMarks();
     st = { ...st, no: st.no + 1, phase: "prompt", cur: plain(R.readingPrompt(s0.topics, Math.random, st.cur.tokens.join(""))) };
     persist(); draw(); $("#rrState").textContent = "";
   };

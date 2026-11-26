@@ -110,6 +110,11 @@ export function addUnit(s, n = 1) {
   return { ...s, completedUnits: Math.max(0, s.completedUnits + n) };
 }
 
+// 연주 평가 기록 1건 누적 (eval-core 형식)
+export function addEval(s, r, add) {
+  return { ...s, eval: add(s.eval, r) };
+}
+
 export function touch(s, now) {
   return { ...s, lastSeenAt: now };
 }
@@ -152,7 +157,8 @@ export function finish(s, now) {
     pauses: pauses.map(p => ({ from: localIso(p.from), to: localIso(p.to), reason: p.reason })),
     completedUnits: s.completedUnits,
     options: s.options || {},
-    topics: s.topicsUsed || s.topics || []
+    topics: s.topicsUsed || s.topics || [],
+    ...(s.eval && s.eval.attempts ? { eval: s.eval } : {})
   };
 }
 

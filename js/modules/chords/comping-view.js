@@ -8,6 +8,7 @@ import { chordBoxSvg } from "../../render/chordbox.js";
 import { KEY_LIST, keyName } from "../../theory/scales.js";
 import { getSetting, setSetting } from "../../core/storage.js";
 import { segHtml, bindPicker, readSel, keyPickerHtml, makeStore, pickKey } from "../scales/common.js";
+import { voicingTarget } from "../../eval/targets.js";
 
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const store = makeStore("fretlab:cmp1");
@@ -105,6 +106,7 @@ export function mount(container, api) {
             if (loops >= 2) { loops = 0; st = { ...st, units: st.units + 1, n: st.n + 1 }; api.addUnit(1); api.toast(`${g.name} 2바퀴 완료 · 이번 세션 ${st.units}회`); persist(); if (list.length > 1) { stop(); switchGenre(); return; } }
           }
           $("#cmpState").textContent = `${b + 1}마디 · ${plan.bars[b].name}`;
+          if (api.eval && plan.voicings[b]) api.eval.prompt(voicingTarget(`${b + 1}마디 ${plan.bars[b].name}`, plan.voicings[b].notes));
           draw();
         },
         onBeat: (b, counting, left) => { beat = counting ? -1 : b; if (counting) $("#cmpState").textContent = `준비 ${left}`; $("#cmpGrid").innerHTML = gridHtml(g.pattern, beat); }
@@ -113,7 +115,7 @@ export function mount(container, api) {
       playing = true; $("#cmpPlay").textContent = "멈춤";
     } catch (e) { api.toast("소리를 켤 수 없음: " + e.message); $("#cmpPlay").textContent = "반주 시작"; }
   }
-  function stop() { stopBacking(); playing = false; bar = -1; beat = -1; $("#cmpPlay").textContent = "반주 시작"; $("#cmpState").textContent = "정지"; draw(); }
+  function stop() { stopBacking(); if (playing && api.eval) api.eval.end(); playing = false; bar = -1; beat = -1; $("#cmpPlay").textContent = "반주 시작"; $("#cmpState").textContent = "정지"; draw(); }
   function switchGenre() { gid = list[st.n % list.length]; g = GENRES[gid]; plan = compVoicings(gid, st.key); loops = 0; draw(); }
   $("#cmpPlay").onclick = () => (isBackingRunning() ? stop() : play());
   $("#cmpDemo").onclick = () => { st = { ...st, demo: !st.demo }; persist(); setPartLevel("comp", st.demo ? 0.6 : 0); draw(); };

@@ -8,6 +8,7 @@ import { keyName } from "../../theory/scales.js";
 import { getSetting, setSetting } from "../../core/storage.js";
 import { esc, segHtml, bindPicker, readSel, makeStore } from "../scales/common.js";
 import { MODES } from "./pattern-view.js";
+import { followTarget, beatLabel } from "../../eval/targets.js";
 
 const store = makeStore("fretlab:rhph1");
 export const clearFinder = () => store.clear();
@@ -109,14 +110,18 @@ export function mount(container, api) {
             }
           }
           $("#phState").textContent = `${b + 1}마디 · ${ph.chords[b].name}`;
+          // 연주 평가: 마디마다 음을 제때·맞는 음으로 쳤는지
+          if (st.mode !== "listen" && api.eval) api.eval.prompt(followTarget(`${ph.name} · ${b + 1}마디`));
+          else if (api.eval) api.eval.info("듣기 모드는 평가하지 않음 · 같이 치기·혼자 치기에서 평가");
           drawProg(); drawChart();
-        }
+        },
+        onSchedule: (e, b, loop, t) => { if (st.mode !== "listen" && api.eval && e.kind !== "perc") api.eval.expect(beatLabel(e.at, b), t, { midis: e.midis ? e.midis : e.midi != null ? [e.midi] : [] }); }
       });
       setRhythmLevel("guitar", MODE_LEVEL[st.mode]);
       playing = true; $("#phPlay").textContent = "멈춤";
     } catch (e) { api.toast("소리를 켤 수 없음: " + e.message); $("#phPlay").textContent = "시작"; }
   }
-  function stop() { stopRhythm(); playing = false; bar = -1; counted = 0; mark(-1); $("#phPlay").textContent = "시작"; $("#phState").textContent = "정지"; drawProg(); drawChart(); }
+  function stop() { stopRhythm(); if (playing && api.eval) api.eval.end(); playing = false; bar = -1; counted = 0; mark(-1); $("#phPlay").textContent = "시작"; $("#phState").textContent = "정지"; drawProg(); drawChart(); }
   function go(d) { stop(); st = { ...st, n: (st.n + d + st.order.length) % st.order.length }; persist(); load(); draw(); }
   $("#phPlay").onclick = () => (isRhythmRunning() ? stop() : play());
   $("#phPrev").onclick = () => go(-1);

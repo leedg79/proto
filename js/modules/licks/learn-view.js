@@ -7,6 +7,8 @@ import { getSetting, setSetting } from "../../core/storage.js";
 import { segHtml, bindPicker, readSel, makeStore } from "../scales/common.js";
 import { KEY_LIST } from "../../theory/scales.js";
 import * as Metro from "../../audio/metronome.js";
+import { lickSeq } from "../../eval/targets.js";
+import { realize } from "./lick-core.js";
 
 const store = makeStore("fretlab:lk1");
 export const clearFinder = () => store.clear();
@@ -67,6 +69,8 @@ export function mount(container, api) {
     $("#lkCard").innerHTML = lickCardHtml(l, { key: st.keys[id] ?? l.key });
     paintScores($("#lkCard"), x => LICKS.find(y => y.id === x));
     $("#lkPrev").disabled = st.idx === 0;
+    // 연주 평가: 화면의 릭을 TAB 순서대로 쳤는지(다 치면 같은 릭으로 다시 평가 시작)
+    if (api.eval) { const r = realize(l, st.keys[id] ?? l.key); api.eval.prompt({ ...lickSeq(`${l.id}${l.name ? " " + l.name : ""}`, r.events), repeat: true }); }
   }
   $("#lkNext").onclick = () => {
     const s = api.getActive(); if (!s || s.status !== "running") { api.toast("세션을 재개한 뒤 넘길 수 있음"); return; }
@@ -96,5 +100,5 @@ export function mount(container, api) {
   });
   const watch = setInterval(() => { const s = api.getActive(); if (metro && (!s || s.status !== "running")) { Metro.stopMetronome(); metro = false; $("#lkMetro").textContent = "메트로놈 켜기"; } }, 300);
   draw();
-  return () => { clearInterval(watch); unplay(); if (metro) Metro.stopMetronome(); };
+  return () => { clearInterval(watch); unplay(); if (metro) Metro.stopMetronome(); if (api.eval) api.eval.end(); };
 }

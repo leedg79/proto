@@ -5,6 +5,7 @@ import { scaleBoardSvg } from "../../render/scaleboard.js";
 import { getSetting, setSetting } from "../../core/storage.js";
 import { esc, makeStore, segHtml, bindPicker, readSel } from "./common.js";
 import * as D from "./drill-core.js";
+import { pcsTarget, midiAt } from "../../eval/targets.js";
 
 // 공용 설정: 연습 구간, 제한시간
 export function regionTimeHtml(p) {
@@ -68,10 +69,17 @@ export function mountPromptDrill(container, api, opts) {
     if (index + 1 >= deck.length) { cycleNo++; deck = opts.makeDeck(cycleNo); index = -1; done = 0; }
     index++;
     st = { ...st, deck, index, done, cycleNo, promptNo: st.promptNo + 1, current: { start: api.elapsedMs(), revealed: false, timedOut: false } };
-    persist(); draw();
+    persist(); draw(); evalPrompt();
+  }
+  // 연주 평가: 제한시간 동안 친 음이 이 스케일 안의 음인지 + 구성음을 모두 쳤는지(수행시간 = 모든 구성음을 친 순간)
+  function evalPrompt() {
+    const p = st.deck[Math.max(0, st.index)];
+    if (!api.eval || !p || !st.current || st.current.revealed) return;
+    api.eval.prompt(pcsTarget(`${p.title} ${p.main}`.trim(), p.shape.map(n => midiAt(n.s, n.f))));
   }
   function doReveal(timedOut) {
     if (!st.current || st.current.revealed) return;
+    if (api.eval) api.eval.end();
     const done = st.done + 1;
     const complete = done >= st.deck.length;
     st = { ...st, done, units: st.units + (complete ? 1 : 0), current: { ...st.current, revealed: true, timedOut } };
@@ -125,7 +133,8 @@ export function mountPromptDrill(container, api, opts) {
   };
   draw(); tick();
   const timer = setInterval(tick, 100);
-  return () => clearInterval(timer);
+  evalPrompt();
+  return () => { clearInterval(timer); if (api.eval) api.eval.end(); };
 }
 
 export function clearStore(key) { makeStore(key).clear(); }

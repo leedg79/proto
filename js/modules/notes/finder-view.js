@@ -5,6 +5,7 @@ import * as F from "./finder-core.js";
 import { positionsOf } from "../../theory/notes.js";
 import { fretboardSvg } from "../../render/fretboard.js";
 import { getSetting, setSetting } from "../../core/storage.js";
+import { midisOf } from "../../eval/targets.js";
 
 const KEY = "fretlab:nf";
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -81,17 +82,27 @@ export function mount(container, api) {
   const running = () => { const s = api.getActive(); return !!s && s.status === "running"; };
 
   function persist() { save(s0.id, st); }
+  // 연주 평가: 문제 음(고른 줄·0~15프렛 안의 위치)이 잡히면 통과, 다른 음은 실수
+  const ev = api.eval;
+  function evalPrompt() {
+    const c = st.current;
+    if (!ev || !c || c.revealed) return;
+    const strings = c.strings.length ? c.strings : [1, 2, 3, 4, 5, 6];
+    ev.prompt({ kind: "note", label: c.name + (c.strings.length ? ` (${c.strings.join("·")}번 현)` : ""), midis: midisOf(positionsOf(c.pc, strings, 15)) });
+  }
 
   function next() {
     if (!running()) return;
     st = F.nextPrompt(st, api.elapsedMs());
     persist();
     drawPrompt();
+    evalPrompt();
   }
 
   function doReveal(timedOut) {
     const r = F.reveal(st, { timedOut });
     if (r.state === st) return;
+    if (ev) ev.end();
     st = r.state;
     persist();
     if (r.completedUnit) {
@@ -161,7 +172,8 @@ export function mount(container, api) {
   };
 
   drawPrompt();
+  evalPrompt();
   tick();
   const timer = setInterval(tick, 100);
-  return () => clearInterval(timer);
+  return () => { clearInterval(timer); if (ev) ev.end(); };
 }

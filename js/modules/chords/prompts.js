@@ -147,3 +147,11 @@ export function buildDeck(topics, rand = Math.random, size = 12) {
   }
   return deck;
 }
+
+// 연주 평가 대상(코드): 구성음 판정. 슬래시는 베이스음, 4도 쌓기는 쌓은 음 기준
+import { chordTarget } from "../../eval/targets.js";
+export function evalTarget(spec) {
+  const d = describe(spec);
+  if (spec.topic === "quartal") return { kind: "chord", label: d.answerName, root: spec.root, pcs: [0, 5, 10, 15].slice(0, spec.count).map(i => (spec.root + i) % 12) };
+  return chordTarget(d.answerName, spec.root, spec.type, spec.topic === "slash" && spec.bass != null ? [spec.bass] : []);
+}

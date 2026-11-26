@@ -70,6 +70,7 @@ export async function startRhythm(o) {
       const t = time + (pos(e.at) - beat) * spb;
       playEvent(inst, e, t, spb, out);
       if (o.onEvent) later(ctx, t, () => o.onEvent(e, bar, loop));
+      if (o.onSchedule) o.onSchedule(e, bar, loop, t);
     }
     if (song) {
       const sb = b % song.beats, band = bus(ctx, "band");
