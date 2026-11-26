@@ -7,7 +7,7 @@ import { playLick, stopLick } from "../../audio/lick-player.js";
 import { unlockAudio, getAudioContext } from "../../audio/context.js";
 import { drum } from "../../audio/drums.js";
 import { masterOut } from "../../audio/sampler.js";
-import { openMic, listen, closeMic, micSupported, isMicOpen } from "../../audio/mic.js";
+import { openMic, listen, closeMic, micSupported, isMicOpen, listInputs, micInfo, setMonitor } from "../../audio/mic.js";
 import { floorFromNoise } from "../../audio/onset-core.js";
 import { getSetting, setSetting } from "../../core/storage.js";
 import { esc, segHtml, bindPicker, readSel, makeStore } from "../scales/common.js";
@@ -64,6 +64,16 @@ export function makeTechTask(level) {
         <p class="small rh-tip" id="tqTip"></p>
         <div class="tq-bpm"><div><b id="tqBpm">-</b><span>BPM</span></div><small id="tqBest" class="muted"></small></div>
         <div class="tq-mic"><span id="tqMicState" class="muted small">마이크 꺼짐</span><span class="tq-meter"><i id="tqMeter"></i></span><button class="btn small" id="tqCal" type="button">박자 보정</button></div>
+        <div class="tq-io">
+          <div class="field"><label for="tqInput">입력 장치</label><select id="tqInput"><option value="">아이폰이 정한 기본 입력</option></select></div>
+          <p class="muted small" id="tqInputInfo" style="margin:4px 0 0">판정을 시작하거나 "입력 확인"을 누르면 장치 목록을 불러옴</p>
+          <label class="tq-mon"><input type="checkbox" id="tqMon"> 기타 소리를 이어폰으로 같이 듣기(입력 모니터링)</label>
+          <details class="tq-help"><summary class="small">오디오 인터페이스·이어폰 연결 안내</summary>
+            <p class="small">iRig 같은 인터페이스를 꽂으면 보통 아이폰이 그 입력을 자동으로 씀. 목록에 보이면 직접 골라도 됨. "입력 확인"을 켜고 손뼉을 쳐 봐서 점이 찍히지 않고 기타 줄에만 반응하면 인터페이스 입력이 맞음(손뼉에도 찍히면 아이폰 마이크로 듣고 있는 것)</p>
+            <p class="small">이어폰은 인터페이스의 헤드폰 단자에 꽂는 것을 권장함. 반주·클릭은 그 단자로 나오고, 기타 소리는 인터페이스가 직접 들려주지 않는 기종(iRig USB 등)은 위 "입력 모니터링"을 켜야 들림(약간 늦게 들릴 수 있음)</p>
+            <p class="small">블루투스 이어폰은 권장하지 않음: 마이크를 쓰는 동안 통화 음질로 바뀌거나 입력이 이어폰 마이크로 바뀔 수 있고, 소리가 늦게 들림(박자 보정으로 일정한 지연은 빠지지만 연주감이 나빠짐)</p>
+          </details>
+        </div>
         <div class="field" style="margin-top:6px"><label>마이크 감도 (바로 바뀜)</label>${segHtml("tqSens", Object.entries(T.SENS).map(([k, v]) => [k, v.label]), getSetting("tech.sens", "mid"))}</div>
         <div class="tq-check">
           <button class="btn small" id="tqCheck" type="button">입력 확인</button>
@@ -129,12 +139,24 @@ export function makeTechTask(level) {
     const setState = t => { $("#tqState").textContent = t; };
     const setMic = t => { $("#tqMicState").textContent = t; };
     let meterTimer = null;
-    const micOpts = () => { const sv = T.sensOf(getSetting("tech.sens", "mid")); return { floor: getSetting("tech.floor", 2e-6) * sv.floorMul, ratio: sv.ratio }; };
+    const micOpts = () => { const sv = T.sensOf(getSetting("tech.sens", "mid")); return { floor: getSetting("tech.floor", 2e-6) * sv.floorMul, ratio: sv.ratio, deviceId: getSetting("audio.input", "") }; };
+    const KIND_TEXT = { builtin: "아이폰 마이크로 보임", headset: "이어폰·헤드셋 마이크로 보임", interface: "외부 입력(오디오 인터페이스 등)으로 보임" };
+    async function refreshInputs() {
+      const sel = $("#tqInput"); if (!sel) return;
+      const list = await listInputs().catch(() => []);
+      const want = getSetting("audio.input", "");
+      sel.innerHTML = `<option value="">아이폰이 정한 기본 입력</option>` + list.map(d => `<option value="${esc(d.deviceId)}" ${d.deviceId === want ? "selected" : ""}>${esc(d.label)}</option>`).join("");
+      const info = micInfo();
+      $("#tqInputInfo").textContent = info ? `지금 듣는 입력: ${info.label || "이름 없음"} · ${KIND_TEXT[info.kind]}${list.length > 1 ? ` · 입력 ${list.length}개 있음` : ""}` : "판정을 시작하거나 \"입력 확인\"을 누르면 장치 목록을 불러옴";
+      $("#tqMon").checked = !!(info && info.monitor);
+    }
     async function ensureMic() {
       if (window.__fretlabTechInject) return true;
       if (!micSupported()) { setMic("이 브라우저는 마이크를 쓸 수 없음"); return false; }
       try {
         const m = await openMic(micOpts());
+        await refreshInputs();
+        if (getSetting("audio.monitor", false)) setMonitor(true);
         setMic(getSetting("tech.latency", null) == null ? "마이크 켜짐 · 박자 보정 전(기본 지연 60ms)" : `마이크 켜짐 · 보정 지연 ${Math.round(getSetting("tech.latency", 0.06) * 1000)}ms`);
         if (!meterTimer) meterTimer = setInterval(() => { const lv = Math.min(1, Math.sqrt(m.level || 0) * 25); const b = $("#tqMeter"); if (b) b.style.width = `${Math.round(lv * 100)}%`; }, 80);
         return true;
@@ -260,6 +282,20 @@ export function makeTechTask(level) {
       if (window.__fretlabTechInject) hits.push(ctx.currentTime);
     }
     $("#tqCheck").onclick = inputCheck;
+    $("#tqInput").onchange = async e => {
+      if (busy) return;
+      setSetting("audio.input", e.target.value);
+      if (isMicOpen() || e.target.value) { closeMic(); await ensureMic(); if (getSetting("audio.monitor", false)) setMonitor(true); await refreshInputs(); }
+      api.toast("입력 장치를 바꿨음. 박자 보정을 다시 하면 정확함");
+    };
+    $("#tqMon").onchange = async e => {
+      const on = e.target.checked;
+      setSetting("audio.monitor", on);
+      if (on && !isMicOpen()) { if (!(await ensureMic())) { e.target.checked = false; return; } }
+      setMonitor(on);
+      const info = micInfo();
+      if (on && info && info.kind === "builtin") api.toast("아이폰 마이크 입력이라 스피커로 들으면 소리가 울릴 수 있음 — 이어폰을 꼈을 때만 켬");
+    };
     $("#tqSens").onclick = async e => {
       const b = e.target.closest("button[data-v]"); if (!b) return;
       $("#tqSens").querySelectorAll("button").forEach(x2 => x2.classList.toggle("sel", x2 === b));

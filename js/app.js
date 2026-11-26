@@ -29,12 +29,13 @@ import { getFlags as getLickFlags } from "./modules/licks/lick-flags.js";
 import { renderJam } from "./modules/jam/jam-view.js";
 import { makePatternTask } from "./modules/rhythm/pattern-view.js";
 import { makeTechTask } from "./modules/technique/tech-view.js";
+import { makeEarTask } from "./modules/ear/ear-view.js";
 import * as RhythmReading from "./modules/rhythm/reading-view.js";
 import * as RhythmPhrase from "./modules/rhythm/phrase-view.js";
 import { strum, loadInstrument } from "./audio/sampler.js";
 import { unlockAudio } from "./audio/context.js";
 
-const APP_VERSION = "2.5.1";
+const APP_VERSION = "2.6.0";
 
 // 구현된 과제의 연습 화면 (모듈/과제 → 화면 모듈)
 // 화면 모듈: settingsHtml, bindSettings, readSettings, mount, clearFinder
@@ -60,7 +61,13 @@ const CONTENT = {
   "rhythm/comping": makePatternTask("comp"),
   "rhythm/fingerstyle": makePatternTask("finger"),
   "rhythm/percussive": makePatternTask("perc"),
-  "rhythm/phrase": RhythmPhrase
+  "rhythm/phrase": RhythmPhrase,
+  "ear/note-name": makeEarTask("note"),
+  "ear/interval": makeEarTask("interval"),
+  "ear/melodic": makeEarTask("melodic"),
+  "ear/harmonic": makeEarTask("harmonic"),
+  "ear/chord-ear": makeEarTask("chord"),
+  "ear/phrase-transcribe": makeEarTask("phrase")
 };
 // 과제에 pending이 있으면(예: Scales 코드 전환하며 익히기) 아직 연습 화면 없음
 const TECH_TASKS = Object.fromEntries(["t1", "t2", "t3", "t4", "t5"].map(l => [l, makeTechTask(l)]));

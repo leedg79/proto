@@ -9,6 +9,11 @@ export function setRecordMode(on) {
   recordMode = !!on;
   try { if (navigator.audioSession) navigator.audioSession.type = recordMode ? "play-and-record" : "playback"; } catch (_) {}
 }
+// iOS가 외부 입력(이어폰·USB 인터페이스)으로 경로를 바꾸게 하려고 마이크 열기 직전 잠깐 "auto"로 둠
+// (WebKit 버그 282939에 보고된 우회 방법)
+export function audioSessionAuto() {
+  try { if (navigator.audioSession) navigator.audioSession.type = "auto"; } catch (_) {}
+}
 
 export function getAudioContext() {
   return ctx;

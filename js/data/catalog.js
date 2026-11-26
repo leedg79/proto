@@ -10,6 +10,8 @@
 export const UNIT = {
   noteCycle: { kind: "cycle", size: 12, label: "12개 음 1순환 = 1회" },
   ear24: { kind: "count", size: 24, label: "24문제 = 1회" },
+  ear10: { kind: "count", size: 10, label: "10문제 = 1회" },
+  ear5: { kind: "count", size: 5, label: "프레이즈 5개 = 1회" },
   blocks5: { kind: "blocks", size: 5, label: "5개 블록 1사이클 = 1회" },
   positions7: { kind: "positions", size: 7, label: "7개 포지션 1사이클 = 1회" },
   mission: { kind: "mission", size: 1, label: "과제 미션 완료 = 1회" },
@@ -209,16 +211,16 @@ export const MODULES = [
         tasks: [{ id: "interval", name: "음정 청음", type: "ear", unit: UNIT.ear24 }]
       },
       {
-        id: "e3", name: "E3 여러 음 청음·채보", desc: "선율(음높이·순서·리듬), 화성(구성음·보이싱), 코드 종류·텐션·진행",
+        id: "e3", name: "E3 여러 음 청음·채보", desc: "선율(음높이·순서·리듬), 화성(자리바꿈·맨 위 음), 코드 종류·텐션·진행",
         tasks: [
-          { id: "melodic", name: "선율 채보", type: "transcribe", unit: UNIT.mission },
-          { id: "harmonic", name: "화성 청음", type: "ear", unit: UNIT.mission },
-          { id: "chord-ear", name: "코드 청음", type: "ear", unit: UNIT.mission }
+          { id: "melodic", name: "선율 채보", type: "transcribe", unit: UNIT.ear10 },
+          { id: "harmonic", name: "화성 청음", type: "ear", unit: UNIT.ear10 },
+          { id: "chord-ear", name: "코드 청음", type: "ear", unit: UNIT.ear10 }
         ]
       },
       {
-        id: "e4", name: "E4 프레이즈·릭 채보", desc: "2마디부터 길이 확장, Blues·Rock·Funk·Jazz, 벤딩·슬라이드 등",
-        tasks: [{ id: "phrase-transcribe", name: "프레이즈 채보", type: "transcribe", unit: UNIT.mission }]
+        id: "e4", name: "E4 프레이즈·릭 채보", desc: "앞 4음부터 전체까지 길이 확장, Blues·Rock·Funk·Jazz 릭을 지판에 채보",
+        tasks: [{ id: "phrase-transcribe", name: "프레이즈 채보", type: "transcribe", unit: UNIT.ear5 }]
       }
     ]
   }

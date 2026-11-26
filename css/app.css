@@ -619,3 +619,30 @@ h1, h2, h3 { margin: 0; line-height: 1.25; }
 .tq-check { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: center; margin: 8px 0 2px; }
 .tq-strip { position: relative; min-height: 30px; background: #0f151e; border: 1px solid #263244; border-radius: 8px; overflow: hidden; display: flex; align-items: center; padding: 0 8px; }
 .tq-strip i { position: absolute; top: 50%; width: 10px; height: 10px; margin: -5px 0 0 -5px; border-radius: 50%; background: #a6f06a; }
+.tq-io { background: #0f151e; border: 1px solid #263244; border-radius: 10px; padding: 10px; margin: 8px 0; }
+.tq-io select { width: 100%; min-height: 40px; background: #121a25; color: var(--text, #e8edf3); border: 1px solid #2c3a4e; border-radius: 8px; padding: 0 8px; font-size: 15px; }
+.tq-mon { display: flex; gap: 8px; align-items: center; margin-top: 8px; font-size: 14px; }
+.tq-help summary { cursor: pointer; margin-top: 8px; color: #9fb0c4; }
+.tq-help p { margin: 6px 0 0; line-height: 1.5; color: #c9d1db; }
+
+/* Ear Lab */
+.ear-choices { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 8px; margin-top: 12px; }
+.ear-choices.deg { grid-template-columns: repeat(4, 1fr); }
+.ear-c, .ear-d { min-height: 48px; font-weight: 700; }
+.ear-c.right, .ear-rh.right { outline: 3px solid #1f9d4c; }
+.ear-c.wrong, .ear-rh.wrong { outline: 3px solid #d22; }
+.ear-seq { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; min-height: 34px; }
+.ear-seq span { min-width: 44px; padding: 6px 8px; text-align: center; border-radius: 8px; background: #0f151e; border: 1px dashed #2c3a4e; color: #6b7a8f; font-weight: 700; }
+.ear-seq span.on { border-style: solid; color: #e8edf3; background: #172131; }
+.ear-fb-wrap { overflow-x: auto; margin-top: 10px; -webkit-overflow-scrolling: touch; }
+.ear-fb { display: grid; gap: 3px; width: max-content; }
+.ear-fs { display: grid; place-items: center; color: #8a96a8; font-size: 12px; }
+.ear-ff { height: 34px; border-radius: 6px; border: 1px solid #263244; background: #121a25; color: #8a96a8; font-size: 12px; }
+.ear-ff.ear-dot { background: #18222f; }
+.ear-ff:active { background: #2a3a52; }
+.ear-feedback { background: #121a25; border: 1px solid #263244; border-radius: 12px; padding: 12px; margin-top: 12px; }
+.ear-feedback p { margin: 6px 0; }
+.ear-verdict { font-size: 22px; font-weight: 900; }
+.ear-verdict.ok { color: #a6f06a; } .ear-verdict.ng { color: #ff9a6a; }
+.ear-rhy { display: grid; gap: 8px; }
+.ear-rh { background: transparent; border: 1px solid #263244; border-radius: 10px; padding: 4px; }
