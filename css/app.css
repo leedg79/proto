@@ -616,3 +616,6 @@ h1, h2, h3 { margin: 0; line-height: 1.25; }
 .score-wrap .j-miss, .score-wrap .j-miss path, .score-wrap .j-miss text { fill: #d22 !important; stroke: #d22; }
 .j-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin: 0 2px 0 6px; }
 .j-dot.good { background: #1f9d4c; } .j-dot.ok { background: #c99a00; } .j-dot.off { background: #e06a1f; } .j-dot.miss { background: #d22; }
+.tq-check { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: center; margin: 8px 0 2px; }
+.tq-strip { position: relative; min-height: 30px; background: #0f151e; border: 1px solid #263244; border-radius: 8px; overflow: hidden; display: flex; align-items: center; padding: 0 8px; }
+.tq-strip i { position: absolute; top: 50%; width: 10px; height: 10px; margin: -5px 0 0 -5px; border-radius: 50%; background: #a6f06a; }

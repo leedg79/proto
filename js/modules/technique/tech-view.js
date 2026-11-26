@@ -7,7 +7,7 @@ import { playLick, stopLick } from "../../audio/lick-player.js";
 import { unlockAudio, getAudioContext } from "../../audio/context.js";
 import { drum } from "../../audio/drums.js";
 import { masterOut } from "../../audio/sampler.js";
-import { openMic, listen, closeMic, micSupported } from "../../audio/mic.js";
+import { openMic, listen, closeMic, micSupported, isMicOpen } from "../../audio/mic.js";
 import { floorFromNoise } from "../../audio/onset-core.js";
 import { getSetting, setSetting } from "../../core/storage.js";
 import { esc, segHtml, bindPicker, readSel, makeStore } from "../scales/common.js";
@@ -25,14 +25,17 @@ export function makeTechTask(level) {
 
   function settingsHtml() {
     return `
-      <div class="field"><label>시작 BPM</label>${segHtml(`${P}Start`, STARTS, getSetting("tech.start", "rec"))}</div>
+      <div class="field"><label>마이크 감도</label>${segHtml(`${P}Sens`, Object.entries(T.SENS).map(([k, v]) => [k, v.label]), getSetting("tech.sens", "mid"))}</div>
+      <div class="field" style="margin-top:14px"><label>시작 BPM</label>${segHtml(`${P}Start`, STARTS, getSetting("tech.start", "rec"))}</div>
       <div class="field" style="margin-top:14px"><label>통과할 때마다 올릴 BPM</label>${segHtml(`${P}Step`, STEPS, String(getSetting("tech.step", 4)))}</div>
       <div class="field" style="margin-top:14px"><label>한 번 판정할 길이</label>${segHtml(`${P}Run`, RUNS, String(getSetting("tech.run", 4)))}</div>
       <div class="field" style="margin-top:14px"><label>연습곡 순서</label>${segHtml(`${P}Order`, [["seq", "순서대로"], ["rand", "무작위"]], getSetting("tech.order", "seq"))}</div>
-      <p class="muted small" style="margin:4px 0 0">마이크로 내가 친 소리의 시작점(어택)을 잡아 악보의 음표·쉼표 박자와 비교함. 이어폰을 끼면 클릭 소리가 마이크에 섞이지 않아 정확함. 처음 한 번 "박자 보정"을 해 두면 기기 지연을 뺌. 통과 ${PASSES_PER_UNIT}회 = 완료 1회</p>`;
+      <p class="muted small" style="margin:4px 0 0">감도: 앰프 없이 일렉을 치거나 소리가 작으면 "민감", 주변 잡음이 많으면 "둔감". 마이크로 내가 친 소리의 시작점(어택)을 잡아 악보의 음표·쉼표 박자와 비교함. 이어폰을 끼면 클릭 소리가 마이크에 섞이지 않아 정확함. 처음 한 번 "박자 보정"을 해 두면 기기 지연을 뺌. 통과 ${PASSES_PER_UNIT}회 = 완료 1회</p>`;
   }
-  function bindSettings(root) { [`${P}Start`, `${P}Step`, `${P}Run`, `${P}Order`].forEach(id => bindPicker(root, id)); }
+  function bindSettings(root) { [`${P}Sens`, `${P}Start`, `${P}Step`, `${P}Run`, `${P}Order`].forEach(id => bindPicker(root, id)); }
   function readSettings(root) {
+    const sens = readSel(root, `${P}Sens`, "v") || "mid";
+    setSetting("tech.sens", sens);
     const o = {
       start: readSel(root, `${P}Start`, "v") || "rec", step: Number(readSel(root, `${P}Step`, "v") || 4),
       run: Number(readSel(root, `${P}Run`, "v") || 4), order: readSel(root, `${P}Order`, "v") || "seq"
@@ -61,6 +64,12 @@ export function makeTechTask(level) {
         <p class="small rh-tip" id="tqTip"></p>
         <div class="tq-bpm"><div><b id="tqBpm">-</b><span>BPM</span></div><small id="tqBest" class="muted"></small></div>
         <div class="tq-mic"><span id="tqMicState" class="muted small">마이크 꺼짐</span><span class="tq-meter"><i id="tqMeter"></i></span><button class="btn small" id="tqCal" type="button">박자 보정</button></div>
+        <div class="field" style="margin-top:6px"><label>마이크 감도 (바로 바뀜)</label>${segHtml("tqSens", Object.entries(T.SENS).map(([k, v]) => [k, v.label]), getSetting("tech.sens", "mid"))}</div>
+        <div class="tq-check">
+          <button class="btn small" id="tqCheck" type="button">입력 확인</button>
+          <div class="tq-strip" id="tqStrip"><span class="muted small">치는 대로 잡힌 어택이 점으로 찍힘</span></div>
+          <b id="tqCount" class="small">0</b>
+        </div>
         <div class="jam-state muted small" id="tqState"></div>
         <div class="nf-actions" style="margin-top:8px">
           <button class="btn primary wide" id="tqJudge" type="button">판정 시작 (클릭 4번 뒤 연주)</button>
@@ -120,11 +129,12 @@ export function makeTechTask(level) {
     const setState = t => { $("#tqState").textContent = t; };
     const setMic = t => { $("#tqMicState").textContent = t; };
     let meterTimer = null;
+    const micOpts = () => { const sv = T.sensOf(getSetting("tech.sens", "mid")); return { floor: getSetting("tech.floor", 2e-6) * sv.floorMul, ratio: sv.ratio }; };
     async function ensureMic() {
       if (window.__fretlabTechInject) return true;
       if (!micSupported()) { setMic("이 브라우저는 마이크를 쓸 수 없음"); return false; }
       try {
-        const m = await openMic({ floor: getSetting("tech.floor", 2e-6) });
+        const m = await openMic(micOpts());
         setMic(getSetting("tech.latency", null) == null ? "마이크 켜짐 · 박자 보정 전(기본 지연 60ms)" : `마이크 켜짐 · 보정 지연 ${Math.round(getSetting("tech.latency", 0.06) * 1000)}ms`);
         if (!meterTimer) meterTimer = setInterval(() => { const lv = Math.min(1, Math.sqrt(m.level || 0) * 25); const b = $("#tqMeter"); if (b) b.style.width = `${Math.round(lv * 100)}%`; }, 80);
         return true;
@@ -138,6 +148,7 @@ export function makeTechTask(level) {
     async function calibrate() {
       if (busy || !running()) { if (!running()) api.toast("연습을 시작(재개)한 뒤 보정할 수 있음"); return; }
       if (!(await ensureMic())) return;
+      stopCheck();
       busy = true; stopLick();
       try {
         await unlockAudio();
@@ -147,8 +158,7 @@ export function makeTechTask(level) {
         setState("보정 1/3 · 조용히 1초…"); await sleep(1100);
         const floor = floorFromNoise(energies.map(x2 => x2[1]));
         setSetting("tech.floor", floor);
-        const m = await openMic({ floor });
-        void m;
+        await openMic(micOpts());
         setState("보정 2/3 · 클릭 4번 — 치지 말고 들어만 봄");
         onsets.length = 0;
         const t0 = ctx.currentTime + 0.3, spb = 0.75;
@@ -184,6 +194,7 @@ export function makeTechTask(level) {
       if (busy) return;
       if (!running()) { api.toast("연습을 시작(재개)한 뒤 판정할 수 있음"); return; }
       if (!(await ensureMic())) return;
+      stopCheck();
       busy = true; stopLick();
       $("#tqJudge").disabled = true;
       try {
@@ -218,6 +229,45 @@ export function makeTechTask(level) {
         drawAll();
       } finally { busy = false; $("#tqJudge").disabled = false; }
     }
+
+    // 입력 확인: 8초 동안 잡힌 어택을 시간 띠에 점으로(최근 4초)
+    let checkOff = null, checkTimer = null;
+    function stopCheck() {
+      if (checkOff) checkOff(); checkOff = null;
+      if (checkTimer) clearInterval(checkTimer); checkTimer = null;
+      $("#tqCheck").textContent = "입력 확인";
+    }
+    async function inputCheck() {
+      if (checkOff) { stopCheck(); return; }
+      if (busy) return;
+      if (!running()) { api.toast("연습을 시작(재개)한 뒤 확인할 수 있음"); return; }
+      if (!(await ensureMic())) return;
+      await unlockAudio();
+      const ctx = getAudioContext();
+      const hits = [], t0 = ctx.currentTime;
+      checkOff = listen({ onOnset: t => hits.push(t) });
+      $("#tqCheck").textContent = "멈춤";
+      const strip = $("#tqStrip");
+      checkTimer = setInterval(() => {
+        const now = ctx.currentTime;
+        strip.innerHTML = hits.filter(t => now - t < 4).map(t => `<i style="left:${Math.max(0, 100 - ((now - t) / 4) * 100)}%"></i>`).join("");
+        $("#tqCount").textContent = hits.length;
+        if (now - t0 > 8) {
+          stopCheck();
+          strip.innerHTML = `<span class="small">${hits.length ? `8초 동안 어택 ${hits.length}개를 잡음. 친 횟수와 비슷하면 이 위치·감도로 판정 가능` : "어택을 하나도 못 잡음. 폰을 줄 가까이 두거나 감도를 \"민감\"으로"}</span>`;
+        }
+      }, 60);
+      if (window.__fretlabTechInject) hits.push(ctx.currentTime);
+    }
+    $("#tqCheck").onclick = inputCheck;
+    $("#tqSens").onclick = async e => {
+      const b = e.target.closest("button[data-v]"); if (!b) return;
+      $("#tqSens").querySelectorAll("button").forEach(x2 => x2.classList.toggle("sel", x2 === b));
+      setSetting("tech.sens", b.dataset.v);
+      if (isMicOpen()) await openMic(micOpts());
+      api.toast(`마이크 감도: ${T.sensOf(b.dataset.v).label}`);
+    };
+    stopFns.push(stopCheck);
 
     function go(d) { if (busy) return; stopLick(); st = { ...st, n: (st.n + d + st.order.length) % st.order.length }; persist(); load(); drawAll(); setState(""); }
     $("#tqJudge").onclick = runJudge;

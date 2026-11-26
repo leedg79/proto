@@ -123,3 +123,11 @@ export function loopEvents(x, loops) {
   for (let l = 0; l < loops; l++) for (const e of x.events) out.push({ ...e, at: e.at + l * x.ticks });
   return { events: out, ticks: x.ticks * loops, feel: x.feel };
 }
+
+// 감도: 민감(앰프 없는 일렉처럼 작은 소리), 보통, 둔감(잡음이 많은 곳). ratio = 직전 울림 대비 배수, floorMul = 보정 소음 기준 배수
+export const SENS = {
+  high: { label: "민감", ratio: 2.8, floorMul: 0.35 },
+  mid: { label: "보통", ratio: 4, floorMul: 1 },
+  low: { label: "둔감", ratio: 6, floorMul: 2.5 }
+};
+export const sensOf = id => SENS[id] || SENS.mid;

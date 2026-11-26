@@ -108,3 +108,16 @@ test("어택 감지: 16분(120·160 BPM)·작은 음·팜뮤트에서 빠짐·�
   assert.equal(detectOnsets(synth([], { dur: 1 }), 48000, { floor: 2e-6 }).length, 0);
   assert.ok(floorFromNoise([1e-8, 2e-8, 3e-8]) >= 2e-6);
 });
+
+test("감도: 민감은 작은 어택도(배수·소음 기준 낮춤), 둔감은 잡음에 덜 반응", () => {
+  assert.ok(T.SENS.high.ratio < T.SENS.mid.ratio && T.SENS.mid.ratio < T.SENS.low.ratio);
+  assert.ok(T.SENS.high.floorMul < 1 && T.SENS.low.floorMul > 1);
+  assert.equal(T.sensOf("없음"), T.SENS.mid);
+  // 앰프 없는 일렉처럼 소리가 작고 소음이 상대적으로 큰 경우: 민감으로 모두 잡음
+  const times = Array.from({ length: 8 }, (_, i) => 0.3 + i * 0.25);
+  const quiet = synth(times, { amp: [0.02, 0.04], noise: 0.004 });
+  const noiseOnly = synth([], { dur: 1, noise: 0.004 });
+  const floor = floorFromNoise(Array.from({ length: 300 }, (_, k) => { let s = 0; for (let i = 0; i < 128; i++) { const d = noiseOnly[k * 128 + i + 1] - noiseOnly[k * 128 + i]; s += d * d; } return s / 128; }));
+  const hi = detectOnsets(quiet, 48000, { floor: floor * T.SENS.high.floorMul, ratio: T.SENS.high.ratio });
+  assert.equal(hi.length, 8);
+});

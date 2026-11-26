@@ -8,8 +8,8 @@ let mic = null;
 export const micSupported = () => !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
 
 // handlers: onEnergy(t, e), onOnset(t)
-export async function openMic({ floor = 2e-6, minGap = 0.05 } = {}) {
-  if (mic) { mic.det.setFloor(floor); mic.det.minGap = minGap; return mic; }
+export async function openMic({ floor = 2e-6, minGap = 0.05, ratio = 4 } = {}) {
+  if (mic) { mic.det.setFloor(floor); mic.det.minGap = minGap; mic.det.ratio = ratio; return mic; }
   if (!micSupported()) throw new Error("이 브라우저는 마이크를 지원하지 않음");
   setRecordMode(true);
   let stream;
@@ -19,7 +19,7 @@ export async function openMic({ floor = 2e-6, minGap = 0.05 } = {}) {
   const ctx = getAudioContext();
   const src = ctx.createMediaStreamSource(stream);
   const mute = ctx.createGain(); mute.gain.value = 0; mute.connect(ctx.destination);
-  const det = new OnsetDetector({ floor, minGap });
+  const det = new OnsetDetector({ floor, minGap, ratio });
   const m = { stream, src, det, node: null, handlers: new Set(), level: 0 };
   const feed = (t, e) => {
     m.level = Math.max(e, m.level * 0.95);
