@@ -122,13 +122,21 @@ export function saveActive(s) {
 }
 
 // 설정
+// 단계별 코스에서 들어온 세션: 미리 정한 설정을 그 세션에만 적용(저장된 내 설정은 그대로 둠)
+let overrides = null;
+export function setOverrides(obj) { overrides = obj ? { ...obj } : null; }
+export function clearOverrides() { overrides = null; }
+export const hasOverrides = () => !!overrides;
+
 export function getSetting(key, def) {
+  if (overrides && key in overrides) return overrides[key];
   try {
     const raw = localStorage.getItem(LS_PREFIX + "set:" + key);
     return raw == null ? def : JSON.parse(raw);
   } catch (_) { return def; }
 }
 export function setSetting(key, value) {
+  if (overrides && key in overrides) { overrides[key] = value; return; }
   localStorage.setItem(LS_PREFIX + "set:" + key, JSON.stringify(value));
 }
 

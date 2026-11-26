@@ -1,6 +1,7 @@
 // FRET LAB 1단계: 화면 라우터와 화면 구성
 import { MODULES, findModule, findLevel, findTask, moduleName, levelName, taskName, SESSION_TYPES, MODULE_ORDER, topicsFor, topicLabel } from "./data/catalog.js";
 import * as Store from "./core/storage.js";
+import { STEPS, COURSES, courseItem, itemCount } from "./data/courses.js";
 import * as S from "./core/session.js";
 import { formatDuration, formatShort, localDateKey } from "./core/clock.js";
 import * as J from "./core/journal.js";
@@ -38,7 +39,7 @@ import * as Ev from "./eval/evaluator.js";
 import { micLevel } from "./audio/mic.js";
 import { summary as evalSummary, summaryText as evalText } from "./eval/eval-core.js";
 
-const APP_VERSION = "2.7.0";
+const APP_VERSION = "2.8.0";
 
 // 구현된 과제의 연습 화면 (모듈/과제 → 화면 모듈)
 // 화면 모듈: settingsHtml, bindSettings, readSettings, mount, clearFinder
@@ -196,6 +197,8 @@ function notifyAutoEnd(r) {
   if (!r) return;
   toast(r.saved ? `세션 자동 종료 · 완료 ${r.record.completedUnits}회 기록함` : "완료 1회 전이라 기록하지 않고 종료함");
 }
+let course = null;   // { step, idx, item, path } 단계별 코스에서 들어온 과제
+
 function render() {
   const parts = parseRoute();
   // 세션 화면을 벗어나면 자동 종료(완료 1회 이상만 기록)
@@ -204,6 +207,8 @@ function render() {
     S.autoEnd("leave").then(r => { S.consumeAutoEnd(); notifyAutoEnd(r); });
   }
   prevMain = parts[0];
+  // 단계별 코스 설정은 그 과제 화면과 세션 화면에서만 유지
+  if (course && !(parts[0] === "session" || (parts[0] === "m" && parts.slice(1, 4).join("/") === course.path))) { course = null; Store.clearOverrides(); }
   runCleanup();
   const [a, b, c, d] = parts;
   let title = "";
@@ -258,12 +263,32 @@ const ICON = {
 };
 
 function renderHome() {
+  const mode = Store.getSetting("home.view", "module");
+  const step = Math.min(5, Math.max(1, Number(Store.getSetting("home.step", 1)) || 1));
   view.innerHTML = `
     <div class="page-head">
       <div class="eyebrow">Guitar Practice System</div>
       <h1>무엇을 연습할까요</h1>
     </div>
     <div class="today" id="today"><span class="muted">오늘 연습</span> <b>-</b></div>
+    <div class="seg home-view" id="homeView"><button type="button" data-v="module" class="${mode === "module" ? "sel" : ""}">모듈별</button><button type="button" data-v="step" class="${mode === "step" ? "sel" : ""}">단계별</button></div>
+    ${mode === "step" ? `
+    <div class="step-tabs" id="stepTabs">${STEPS.map(x => `<button type="button" data-step="${x.id}" class="${x.id === step ? "sel" : ""}"><b>${x.id}</b><span>${esc(x.name)}</span></button>`).join("")}</div>
+    <p class="step-goal">${esc(STEPS[step - 1].goal)}</p>
+    <div class="list course-list" id="courseList">
+      ${COURSES[step].map((it, i) => it.pending ? `
+        <div class="list-item course-item pending" style="--mc:${modColor(it.mod)}">
+          <span class="cbar"></span>
+          <div class="txt"><b>${esc(it.title)}</b><span>${esc(moduleName(it.mod))} · ${esc(it.note)}</span></div>
+          <span class="tag">준비 중</span>
+        </div>` : `
+        <button class="list-item course-item" type="button" data-ci="${i}" style="--mc:${modColor(it.mod)}">
+          <span class="cbar"></span>
+          <div class="txt"><b>${esc(it.title)}</b><span>${esc(moduleName(it.mod))} · ${esc(levelName(it.mod, it.lvl))} · ${esc(taskName(it.mod, it.lvl, it.task))}${it.note ? ` — ${esc(it.note)}` : ""}</span></div>
+          <span class="done-count" data-cnt="${i}"></span>
+          <div class="chev">›</div>
+        </button>`).join("")}
+    </div>` : `
     <div class="module-grid">
       ${MODULES.map((m, i) => `
         <button class="module-card ${MODULES.length % 2 && i === MODULES.length - 1 ? "wide" : ""}" type="button" data-mod="${m.id}" style="--mc:${modColor(m.id)}">
@@ -271,7 +296,7 @@ function renderHome() {
           <span><strong>${esc(m.name)}</strong><small>${esc(m.sub)}</small></span>
           <span class="meta">${m.levels.length} LEVELS</span>
         </button>`).join("")}
-    </div>
+    </div>`}
     <div class="tool-row">
       <button class="tool-card" type="button" data-go="jam">${ICON.jam}<div><b>백킹 트랙</b><span>진행·키·템포 반주</span></div></button>
       <button class="tool-card" type="button" data-go="journal">${ICON.journal}<div><b>학습일지</b><span>연·월·일 기록</span></div></button>
@@ -279,6 +304,12 @@ function renderHome() {
     </div>
     <div id="homeNotice"></div>`;
   view.onclick = e => {
+    const v = e.target.closest("#homeView [data-v]");
+    if (v) { Store.setSetting("home.view", v.dataset.v); return renderHome(); }
+    const st = e.target.closest("#stepTabs [data-step]");
+    if (st) { Store.setSetting("home.step", Number(st.dataset.step)); return renderHome(); }
+    const ci = e.target.closest("[data-ci]");
+    if (ci) return openCourseItem(step, Number(ci.dataset.ci));
     const m = e.target.closest("[data-mod]");
     if (m) return go(`m/${m.dataset.mod}`);
     const g = e.target.closest("[data-go]");
@@ -289,6 +320,19 @@ function renderHome() {
     const d = J.summarizeDay(list, today);
     const el = $("#today");
     if (el) el.innerHTML = `<span class="muted">오늘 연습</span> <b>${formatShort(d.totals.sec)}</b> <span class="muted">· 완료 ${d.totals.units}회 · 세션 ${d.totals.sessions}개</span>`;
+    if (mode === "step") {
+      let done = 0, total = 0;
+      COURSES[step].forEach((it, i) => {
+        if (it.pending) return;
+        total++;
+        const n = itemCount(it, list);
+        if (n) done++;
+        const c = view.querySelector(`[data-cnt="${i}"]`);
+        if (c) c.innerHTML = n ? `<span class="tag accent">${n}회</span>` : "";
+      });
+      const g = $(".step-goal");
+      if (g) g.innerHTML = `${esc(STEPS[step - 1].goal)} <span class="muted">· 해 본 항목 ${done}/${total}</span>`;
+    }
     const last = Store.getSetting("lastBackupAt", 0);
     const stale = list.length > 0 && (!last || Date.now() - last > 7 * 864e5);
     const n = $("#homeNotice");
@@ -297,6 +341,18 @@ function renderHome() {
     }
   });
   return "";
+}
+
+// 단계별 코스 항목 → 미리 정한 주제·설정을 이 세션에만 적용하고 과제 화면으로
+function openCourseItem(step, idx) {
+  const it = courseItem(step, idx);
+  if (!it || it.pending) return;
+  const path = `${it.mod}/${it.lvl}/${it.task}`;
+  const ov = { ...(it.set || {}) };
+  if (it.topics.length) ov[`topics:${path}`] = it.topics;
+  Store.setOverrides(ov);
+  course = { step, idx, item: it, path };
+  go(`m/${path}`);
 }
 
 // ───────────── 레벨 선택 ─────────────
@@ -395,6 +451,7 @@ function renderTask(modId, lvlId, taskId) {
           <span class="tag">${esc(t.unit.label)}</span>
         </div>
       </div>
+      ${course && course.path === `${modId}/${lvlId}/${taskId}` ? `<div class="course-banner span-all"><b>${esc(STEPS[course.step - 1].name)} 코스</b> · ${esc(course.item.title)}<br><span class="muted small">코스에서 정한 학습 주제·설정이 미리 골라져 있음. 이 세션에만 적용되고 모듈 메뉴의 내 설정은 바뀌지 않음</span></div>` : ""}
       ${topics.length ? `<div class="panel span-all" id="topicPanel">
         <div class="topic-head"><h3 class="panel-title">학습 주제</h3><button type="button" class="btn small ghost" id="topicAll">전체 선택</button></div>
         <div class="topic-list">${topics.map(tp => `<label class="topic ${tp.pending ? "pending" : ""}"><input type="checkbox" value="${esc(tp.id)}" ${selected.has(tp.id) ? "checked" : ""} ${tp.pending ? "disabled" : ""}><span>${esc(tp.name)}${tp.pending ? ` <small>${esc(tp.pending)}</small>` : ""}</span></label>`).join("")}</div>

@@ -130,11 +130,11 @@ export const MODULES = [
     sub: "코드 형태 · 보이싱 · 진행",
     stage: 3,
     levels: [
-      { id: "c1", name: "C1 초급", desc: "오픈 코드, 메이저·마이너 트라이어드, 파워 코드", tasks: CHORD_TASKS },
-      { id: "c2", name: "C2 중급", desc: "바레·이동형 코드, 디미니시드·어그먼티드·서스펜디드, 트라이어드 전위, 현 그룹별 트라이어드·트라이어드 매핑, CAGED, 7th 코드", tasks: CHORD_TASKS },
-      { id: "c3", name: "C3 상급", desc: "7th 코드 전위, Shell Voicing, Drop 2·Drop 3, 9th·11th·13th 텐션", tasks: CHORD_TASKS },
-      { id: "c4", name: "C4 고급", desc: "대리 코드, 슬래시 코드, Open·Quartal Voicing", tasks: CHORD_TASKS },
-      { id: "c5", name: "C5 응용", desc: "보이스 리딩(Play Session), 장르별 컴핑, 코드 멜로디", tasks: PLAY_TASKS }
+      { id: "c1", name: "C1 기본 코드", desc: "오픈 코드, 메이저·마이너 트라이어드, 파워 코드", tasks: CHORD_TASKS },
+      { id: "c2", name: "C2 바레·확장 코드", desc: "바레·이동형 코드, 디미니시드·어그먼티드·서스펜디드, 트라이어드 전위, 현 그룹별 트라이어드·트라이어드 매핑, CAGED, 7th 코드", tasks: CHORD_TASKS },
+      { id: "c3", name: "C3 재즈 보이싱", desc: "7th 코드 전위, Shell Voicing, Drop 2·Drop 3, 9th·11th·13th 텐션", tasks: CHORD_TASKS },
+      { id: "c4", name: "C4 응용 보이싱", desc: "대리 코드, 슬래시 코드, Open·Quartal Voicing", tasks: CHORD_TASKS },
+      { id: "c5", name: "C5 반주·코드 멜로디", desc: "보이스 리딩(Play Session), 장르별 컴핑, 코드 멜로디", tasks: PLAY_TASKS }
     ]
   },
   {
