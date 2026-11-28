@@ -25,7 +25,11 @@ test("코스 항목 해 본 횟수", () => {
     { module: "chords", level: "c2", task: "random-chord", topics: ["open"] }
   ];
   assert.equal(itemCount(it, recs), 1);
-  assert.equal(itemCount(COURSES[1][0], [{ module: "notes", level: "n1", task: "note-finder", topics: [] }]), 1);
+  assert.equal(itemCount(COURSES[1][0], [{ module: "notes", level: "n2", task: "note-finder", topics: [] }]), 1);
+  // v2.10.0: 1단계 = 6현 전체·오픈 코드 반주, 2단계 = 무작위 3~4현·마이너 펜타 모양
+  const ids = n => COURSES[n].map(x => `${x.mod}/${x.lvl}/${x.task}`);
+  assert.ok(ids(1).includes("notes/n2/note-finder") && ids(1).includes("chords/c1/play-session") && !ids(1).includes("scales/pb/shape-learning"));
+  assert.ok(ids(2).includes("notes/n1/note-finder") && ids(2).includes("scales/pb/shape-learning") && !ids(2).includes("chords/c1/play-session"));
 });
 
 import { practiceSeries } from "../js/core/journal.js";

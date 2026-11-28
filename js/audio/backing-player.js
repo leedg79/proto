@@ -1,5 +1,5 @@
 // 반주 재생기: buildBacking 결과를 박 스케줄러로 반복 재생, 파트별 음량·끄기, 준비 박 4개
-import { getAudioContext, unlockAudio } from "./context.js";
+import { getAudioContext, unlockAudio, onAudioReset } from "./context.js";
 import { BeatScheduler } from "./scheduler.js";
 import { loadInstrument, playNote, strum, masterOut } from "./sampler.js";
 import { drum } from "./drums.js";
@@ -16,7 +16,7 @@ export async function preload() {
 }
 
 function partGain(ctx, part) {
-  if (!gains[part]) { gains[part] = ctx.createGain(); gains[part].gain.value = { drums: 0.7, bass: 0.9, comp: 0.6 }[part] ?? 0.8; gains[part].connect(masterOut(ctx)); }
+  if (!gains[part] || gains[part].context !== ctx) { gains[part] = ctx.createGain(); gains[part].gain.value = { drums: 0.7, bass: 0.9, comp: 0.6 }[part] ?? 0.8; gains[part].connect(masterOut(ctx)); }
   return gains[part];
 }
 
@@ -71,5 +71,6 @@ export function setCompOn(on) { const ctx = getAudioContext(); if (ctx) setPartL
 export function setBackingBpm(bpm) { if (sched) sched.setBpm(bpm); }
 export const backingBpm = () => (sched ? sched.bpm : null);
 export function stopBacking() { if (sched) sched.stop(); sched = null; state = null; }
+onAudioReset(() => stopBacking());
 export const isBackingRunning = () => !!(sched && sched.running);
 export { buildBacking };

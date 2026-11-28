@@ -1,7 +1,7 @@
 // 연주 평가 실행기 (세션 하나에 하나)
 // 마이크 소리 → 음 높이(YIN)·크로마·어택 → 지금 문제(target)를 판정하고 세션 기록에 넣음
 // 화면(모듈)은 평가가 꺼져 있어도 prompt / end / expect 를 그냥 부르면 됨(꺼져 있으면 아무것도 안 함)
-import { openMic, closeMic, listen, isMicOpen, micInfo, micHandle, listenerCount } from "../audio/mic.js";
+import { openMic, closeMic, listen, isMicOpen, micInfo, micHandle, listenerCount, micLevel } from "../audio/mic.js";
 import { getAudioContext } from "../audio/context.js";
 import { getSetting } from "../core/storage.js";
 import { yin, nearestNote, chroma, dbToMag } from "./pitch-core.js";
@@ -16,6 +16,10 @@ let held = null, cand = null, candN = 0, onsetSince = false;
 let lastText = "";
 let lastNote = null;
 const subs = new Set();
+const heardSubs = new Set();   // 들린 음(대상과 무관): 혼자 익히기 등
+const recSubs = new Set();     // 판정 기록이 날 때
+let grace = null;              // 순서 대상: 구간이 바뀐 직후 앞 구간의 늦은 음을 받아 주는 여유 { a, until, id }
+let lastWrong = null;          // 순서 대상: 방금 틀림으로 센 음(다음 구간 첫 음을 미리 친 경우 옮겨 줌)
 const now = () => { try { return getAudioContext().currentTime; } catch (_) { return performance.now() / 1000; } };
 
 export const isOn = () => on;
@@ -23,10 +27,13 @@ export const lastFeedback = () => lastText;
 export const heard = () => lastNote;
 export function setSink(fn) { sink = fn; }
 export function onChange(fn) { subs.add(fn); return () => subs.delete(fn); }
+export function onHeard(fn) { heardSubs.add(fn); return () => heardSubs.delete(fn); }
+export function onRecord(fn) { recSubs.add(fn); return () => recSubs.delete(fn); }
 function emit(text, kind = "") { if (text != null) lastText = text; for (const f of subs) { try { f({ text: lastText, kind }); } catch (_) {} } }
 
 function record(r) {
   if (sink) sink(r);
+  for (const f of recSubs) { try { f(r); } catch (_) {} }
   const tm = r.timeMs != null ? ` · ${(r.timeMs / 1000).toFixed(1)}초` : r.meanMs != null ? ` · 오차 ${r.meanMs}ms` : "";
   const ms = r.mistakes && r.mistakes.length ? ` · 실수: ${r.mistakes.slice(0, 2).join(", ")}${r.mistakes.length > 2 ? " 외" : ""}` : "";
   emit(`${r.ok ? "통과" : "미통과"} · ${r.label} · 정확도 ${Math.round((r.score || 0) * 100)}%${tm}${ms}`, r.ok ? "ok" : "bad");
@@ -50,14 +57,41 @@ export function prompt(target) {
   flushClosing();
   const t = now();
   const before = lastText;
-  if (cur && !cur.reported) { cur = withExpected(cur, t - 0.05); settle(); }
+  let carry = null;
+  settleGrace();
+  if (cur && !cur.reported && cur.target.kind === "seq" && target.kind === "seq" && !cur.finished) {
+    // 다음 구간 첫 음을 박보다 조금 먼저 친 경우: 앞 구간의 틀림에서 빼고 새 구간으로 넘김
+    if (lastWrong && t - lastWrong.t < 0.25 && seqOk(target, 0, lastWrong.midi)) {
+      carry = lastWrong;
+      cur = { ...cur, wrong: cur.wrong.slice(0, -1), notes: cur.notes.slice(0, -1) };
+    }
+    // 앞 구간 끝 음이 조금 늦게 들어오는 몫은 0.3초 동안 받아 줌
+    const id = setTimeout(settleGrace, 320);
+    grace = { a: cur, until: t + 0.3, id };
+  } else if (cur && !cur.reported) { cur = withExpected(cur, t - 0.05); settle(); }
+  lastWrong = null;
   cur = { ...E.startAttempt(target, t), reported: false };
+  if (carry) { const r = E.feedNote(cur, carry.midi, carry.t); cur = { ...r.a, reported: false }; }
   sched = sched.filter(e => e.t > t - 10);
   // 방금 앞 시도 결과를 냈으면 그 결과를 그대로 보여 줌
   if (lastText === before) emit(`평가 중 · ${target.label}`, "");
 }
+const mod12 = n => ((n % 12) + 12) % 12;
+function seqOk(T, i, m) {
+  if (!T.midis || i >= T.midis.length) return false;
+  const list = (T.alts && T.alts[i]) || [T.midis[i]];
+  return T.octaveFree ? list.some(x => mod12(x) === mod12(m)) : list.includes(m);
+}
+function settleGrace() {
+  if (!grace) return;
+  clearTimeout(grace.id);
+  const g = grace; grace = null;
+  if (g.a.reported) return;
+  const keep = cur; cur = g.a; settle(); cur = keep;
+}
 export function end() {
   pendingTarget = null;
+  settleGrace();
   if (!on || !cur || cur.reported) { cur = null; return; }
   if (timed(cur)) {
     // 마지막 박 뒤 어택·음 높이가 늦게 들어오는 몫을 기다렸다가 마감
@@ -84,6 +118,7 @@ export function info(text) { if (on) emit(text, ""); }
 export function report(r) { if (on) record(r); }
 
 function settle() {
+  if (!cur) return;
   const r = E.finishAttempt(cur, now(), { minNotes: 3 });
   cur = { ...cur, reported: true };
   // 아무 소리도 없던 타이밍 대상(박 0개)은 기록하지 않음
@@ -93,20 +128,30 @@ function settle() {
 
 function onNote(midi, t) {
   lastNote = { midi, name: E.noteName(midi), t };
+  for (const f of heardSubs) { try { f(lastNote); } catch (_) {} }
+  // 구간이 막 바뀐 직후: 앞 구간에서 기다리던 음이면 앞 구간으로
+  if (grace && t <= grace.until && seqOk(grace.a.target, grace.a.idx, midi)) {
+    const r = E.feedNote(grace.a, midi, t);
+    grace.a = { ...r.a, reported: false };
+    if (r.event === "ok") settleGrace();
+    return;
+  }
   if (closeTimer && closeTimer.c.target.kind === "follow") closeTimer.c = { ...E.feedNote(closeTimer.c, midi, t).a, reported: false };
   if (!cur || cur.reported) { emit(null); return; }
   const k = cur.target.kind;
   if (k === "follow") { cur = { ...E.feedNote(cur, midi, t).a, reported: false }; emit(`들린 음 ${E.noteName(midi)} · ${cur.target.label}`); return; }
-  if (k !== "note" && k !== "set" && k !== "seq") { emit(null); return; }
+  if (k !== "note" && k !== "set" && k !== "seq" && k !== "count") { emit(null); return; }
   const r = E.feedNote(cur, midi, t);
   cur = { ...r.a, reported: false };
-  if (r.event === "ok" && (k === "note" || k === "seq")) {
+  if (k === "seq" && r.event === "wrong") lastWrong = { midi, t };
+  if (r.event === "ok" && (k === "note" || k === "seq" || k === "count")) {
     settle();
     // 반복 대상(릭 익히기 등): 다 친 뒤 같은 대상으로 다시 시작
     if (cur.target.repeat) cur = { ...E.startAttempt(cur.target, now()), reported: false };
     return;
   }
   if (r.event === "wrong") emit(`틀림 · ${E.noteName(midi)} · ${cur.target.label}`, "bad");
+  else if (k === "count") emit(`${cur.hits}/${cur.target.need}음 · ${cur.target.label}`, "");
   else if (k === "seq" && r.event === "progress") emit(`${cur.idx}/${cur.target.midis.length}음 · ${cur.target.label}`, "");
   else if (k === "set") emit(`${cur.covered.length}/${new Set(cur.target.pcs.map(p => ((p % 12) + 12) % 12)).size}음 · 밖 ${cur.wrong.length} · ${cur.target.label}`, "");
   else emit(null);
@@ -139,8 +184,8 @@ function attach() {
     if (!reopening) { reopening = true; openMic(micOpts()).catch(() => {}).finally(() => { reopening = false; }); }
     return false;
   }
-  if (attached === m) return true;
   const ctx = getAudioContext();
+  if (attached === m && analyser && analyser.context === ctx) return true;
   try { analyser && analyser.disconnect(); } catch (_) {}
   analyser = ctx.createAnalyser();
   analyser.fftSize = 4096;
@@ -152,14 +197,22 @@ function attach() {
   return true;
 }
 
+let enabling = null;
 export async function enable() {
   if (on) return true;
+  if (enabling) return enabling;
+  enabling = (async () => { try { return await doEnable(); } finally { enabling = null; } })();
+  return enabling;
+}
+async function doEnable() {
   await openMic(micOpts());
-  const ctx = getAudioContext();
   attach();
   const buf = new Float32Array(2048), fbuf = new Float32Array(2048);
+  if (poll) clearInterval(poll);
   poll = setInterval(() => {
     if (window.__fretlabEvalInject || !attach()) return;
+    const ctx = getAudioContext();
+    if (!ctx || analyser.context !== ctx) { attached = null; return; }
     analyser.getFloatTimeDomainData(buf);
     const r = yin(buf, ctx.sampleRate);
     const t = ctx.currentTime;
@@ -182,6 +235,7 @@ export async function enable() {
 
 export function disable({ keepMic = false } = {}) {
   flushClosing();
+  settleGrace();
   if (cur && !cur.reported && on) { cur = withExpected(cur, Infinity); settle(); }
   sched = [];
   cur = null;
@@ -195,6 +249,7 @@ export function disable({ keepMic = false } = {}) {
   emit("평가 꺼짐", "");
 }
 
+export const level = () => micLevel();
 export const inputLabel = () => { const i = micInfo(); return i ? i.label || "기본 입력" : ""; };
 
 // ── 테스트용: 마이크 없이 감지 결과를 넣음 ──
@@ -204,6 +259,7 @@ export const _test = {
   chroma: ch => onChroma(ch, now(), true),
   onset: (t = null) => onOnset((t ?? now()) + getSetting("tech.latency", 0.06)),
   enableFake() { on = true; if (pendingTarget) prompt(pendingTarget); emit("평가 켜짐(테스트)"); },
+  grace: () => settleGrace(),
   current: () => (cur ? withExpected(cur, Infinity) : null),
   flush: () => flushClosing()
 };

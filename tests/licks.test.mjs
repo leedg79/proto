@@ -80,3 +80,30 @@ test("릭 활용: 옮기기·변형·주고받기 코드", async () => {
     assert.ok(c.custom.every(b => b.segs.reduce((a, x) => a + x.beats, 0) === 4), `${l.id} 마디 4박`);
   }
 });
+
+test("장르 릭 자리: 장르 8개·기타리스트, 줄 형식으로 넣으면 메뉴·검색·난이도에 반영", async () => {
+  const L = await import("../js/modules/licks/lick-core.js");
+  const { LICK_GENRES, findTask, topicsFor } = await import("../js/data/catalog.js");
+  assert.deepEqual(LICK_GENRES.map(g => g[0]), ["blues", "neosoul", "rnb", "pop", "funk", "rock", "metal", "jazz"]);
+  assert.deepEqual(L.GENRES.map(g => g.id), LICK_GENRES.map(g => g[0]));
+  assert.ok(L.GENRES.every(g => g.players.length >= 4 && new Set(g.players.map(p => p.id)).size === g.players.length));
+  assert.ok(L.GENRES.find(g => g.id === "blues").players.some(p => p.id === "srv"));
+  for (const [id] of LICK_GENRES) { assert.ok(findTask("licks", `g-${id}`, "lick-one")); assert.deepEqual(topicsFor("licks", `g-${id}`, "lick-one"), []); }
+  assert.equal(L.basicLicksSorted().length, 135);
+  const ds = L.basicLicksSorted().map(L.lickDifficulty);
+  assert.deepEqual(ds, [...ds].sort((a, b) => a - b));
+  // 시험용 줄 2개(4마디·20프렛까지 허용)
+  L.setGenreRows([
+    ["T-01", "blues", "srv", 2, "minor-penta", 4, "c", "shuffle", "1-15:qb2 1-12:e 2-15:e 2-12:q 3-14:q~"],
+    ["T-02", "blues", "srv", 3, "minor-penta", 4, "l", "straight", "1-19:s 1-17:s 2-20:s 2-17:s 3-19:s 3-16:s 4-19:s 4-17:s -:h -:w -:w -:w"]
+  ]);
+  assert.equal(L.genreLicks({ genre: "blues", player: "srv" }).length, 2);
+  assert.equal(L.genreLicks({ genre: "blues", player: "srv", diff: 3 }).length, 1);
+  const t2 = L.lickById("T-02");
+  assert.equal(t2.level, "g-blues"); assert.equal(t2.bars, 4); assert.equal(L.realize(t2).difficulty, 3);
+  assert.deepEqual(L.validate(t2), []);
+  assert.equal(L.playerOf(t2).name, "Stevie Ray Vaughan");
+  assert.equal(L.allLicks().length, L.LICKS.length + 2);
+  L.setGenreRows([]);
+  assert.equal(L.lickById("T-02"), null);
+});

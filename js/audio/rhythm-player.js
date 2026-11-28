@@ -1,6 +1,6 @@
 // 리듬 재생기: 마디마다 이벤트를 받아 반복 재생. 클릭·반주(드럼·베이스)·기타 시범 소리를 따로 조절
 // 시각은 오디오 시계로 예약하고(BeatScheduler), 화면 갱신만 setTimeout으로 맞춤
-import { getAudioContext, unlockAudio } from "./context.js";
+import { getAudioContext, unlockAudio, onAudioReset } from "./context.js";
 import { BeatScheduler } from "./scheduler.js";
 import { loadInstrument, playNote, strum, masterOut } from "./sampler.js";
 import { drum } from "./drums.js";
@@ -11,7 +11,7 @@ const buses = {};
 const DEF = { guitar: 0.9, click: 0.8, band: 0.75 };
 
 function bus(ctx, name) {
-  if (!buses[name]) { buses[name] = ctx.createGain(); buses[name].gain.value = DEF[name] ?? 0.8; buses[name].connect(masterOut(ctx)); }
+  if (!buses[name] || buses[name].context !== ctx) { buses[name] = ctx.createGain(); buses[name].gain.value = DEF[name] ?? 0.8; buses[name].connect(masterOut(ctx)); }
   return buses[name];
 }
 export function setRhythmLevel(name, v) {
@@ -100,4 +100,5 @@ function playEvent(inst, e, t, spb, out) {
 
 export function setRhythmBpm(bpm) { if (sched) sched.setBpm(bpm); }
 export function stopRhythm() { if (sched) sched.stop(); sched = null; timers.forEach(clearTimeout); timers = []; }
+onAudioReset(() => stopRhythm());
 export const isRhythmRunning = () => !!(sched && sched.running);

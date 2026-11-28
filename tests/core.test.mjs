@@ -146,7 +146,9 @@ test("병합 계획 계산", () => {
 
 test("레벨·완료 단위 정의가 결정 사항과 일치", () => {
   const counts = Object.fromEntries(MODULES.map(m => [m.id, m.levels.length]));
-  assert.deepEqual(counts, { notes: 2, chords: 5, rhythm: 3, scales: 4, licks: 7, technique: 5, ear: 4 }); // Rhythm R3 Picking은 Technique로 옮김
+  assert.deepEqual(counts, { notes: 2, chords: 5, rhythm: 3, scales: 4, licks: 16, technique: 5, ear: 4 }); // Rhythm R3 Picking은 Technique로 옮김, 릭 = L1~L7 + 기본 릭 모음 + 장르 8개(v2.10.0)
+  // Notes: 6현 전체가 먼저(N1, 아이디 n2), 무작위 3~4현이 다음(N2, 아이디 n1)
+  assert.deepEqual(MODULES.find(m => m.id === "notes").levels.map(l => `${l.id}:${l.name}`), ["n2:N1 전체 6현", "n1:N2 무작위 3~4현"]);
   const notes = MODULES.find(m => m.id === "notes");
   assert.equal(notes.levels[0].tasks[0].unit, UNIT.noteCycle);
   const ear = MODULES.find(m => m.id === "ear");

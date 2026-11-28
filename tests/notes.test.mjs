@@ -54,18 +54,20 @@ test("중간에 멈추면 완료 0회", () => {
   assert.equal(F.cycleProgress(st).done, 11);
 });
 
-test("N1은 3~4개 현(중복 없음, 오름차순), N2는 전체", () => {
+test("무작위 현(n1)은 3~4개 현(중복 없음, 순서도 무작위), 6현(n2)은 전체", () => {
   const rand = seeded(7);
   const counts = new Set();
+  let unsorted = 0;
   for (let i = 0; i < 500; i++) {
     const s = F.pickStrings("n1", rand);
     counts.add(s.length);
     assert.ok(s.length === 3 || s.length === 4);
     assert.equal(new Set(s).size, s.length);
-    assert.deepEqual([...s].sort((a, b) => a - b), s);
+    if ([...s].sort((a, b) => a - b).join() !== s.join()) unsorted++;
     assert.ok(s.every(x => x >= 1 && x <= 6));
   }
   assert.deepEqual([...counts].sort(), [3, 4]);
+  assert.ok(unsorted > 300, `오름차순이 아닌 경우 ${unsorted}/500`);
   assert.deepEqual(F.pickStrings("n2", rand), []);
 });
 

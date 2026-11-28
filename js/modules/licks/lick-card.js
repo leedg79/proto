@@ -3,7 +3,7 @@ import { realize, overText, USE_NAMES, FEEL_NAMES, TECH_NAMES, scaleNameOf } fro
 import { LICK_LEVELS } from "../../data/catalog.js";
 import { tabSvg } from "../../render/tab.js";
 import { scoreSvg } from "../../render/score.js";
-import { lickById } from "./lick-core.js";
+import { lickById, playerOf } from "./lick-core.js";
 import { scaleBoardSvg } from "../../render/scaleboard.js";
 import { getFlags } from "./lick-flags.js";
 import { playLick, stopLick } from "../../audio/lick-player.js";
@@ -34,7 +34,7 @@ export function lickCardHtml(lick, { key = lick.key, chordLabels = true } = {}) 
         </div>
       </div>
       <div class="tag-row lick-tags">
-        <span class="tag accent">${esc(SUB_NAME[r.sub] || r.sub)}</span>
+        <span class="tag accent">${esc(lick.genreLick ? `${(playerOf(lick) || {}).genreName || ""} · ${(playerOf(lick) || {}).name || lick.player}` : SUB_NAME[r.sub] || r.sub)}</span>
         <span class="tag">${esc(USE_NAMES[r.use] || r.use)}</span>
         <span class="tag">${esc(FEEL_NAMES[r.feel] || r.feel)}</span>
         <span class="tag">난이도 ${"●".repeat(r.difficulty)}${"○".repeat(3 - r.difficulty)}</span>
@@ -43,6 +43,7 @@ export function lickCardHtml(lick, { key = lick.key, chordLabels = true } = {}) 
       <div class="lick-play-row"><button type="button" class="btn small primary" data-play="${esc(r.id)}" data-key="${r.key}">▶ 듣기</button><span class="muted small">벤딩·슬라이드·비브라토 포함 샘플 재생</span></div>
       <div class="tab-wrap score-wrap" data-tab="${esc(r.id)}" data-score="${esc(r.id)}" data-key="${r.key}"></div>
       <div class="fretboard">${scaleBoardSvg(marks, { from, to })}</div>
+      ${lick.note ? `<p class="muted small" style="margin:6px 0 0">${esc(lick.note)}</p>` : ""}
       <dl class="lick-info">
         <dt>위치</dt><dd>${esc(r.blockName)} (${r.blockLo}~${r.blockHi}프렛)${r.rootString ? ` · 근음 ${r.rootString}번 줄 ${r.rootFret}프렛` : ""}</dd>
         <dt>코드</dt><dd>${esc(overText(r))}</dd>

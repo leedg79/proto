@@ -37,7 +37,8 @@ export function pickStrings(level, rand = Math.random) {
     const s = pool.splice(Math.floor(rand() * pool.length), 1)[0];
     out.push(s);
   }
-  return out.sort((x, y) => x - y);
+  // 줄 순서도 무작위(예: 5-3-1-4)
+  return out;
 }
 
 export function initFinder({ level, timeLimit }) {

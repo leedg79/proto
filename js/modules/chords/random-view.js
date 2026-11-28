@@ -1,7 +1,7 @@
 // Random Chord Finding 화면: 문제 카드 → 제한시간 → 정답 확인 → 가능한 운지 전부 → 다음 문제
 
 import * as R from "./random-core.js";
-import { answersOf, describe, evalTarget } from "./prompts.js";
+import { answersOf, describe } from "./prompts.js";
 import { chordGrid } from "../../render/chordbox.js";
 import { rankVoicings } from "../../theory/voicings.js";
 import { getSetting, setSetting } from "../../core/storage.js";
@@ -71,7 +71,8 @@ export function mount(container, api) {
   const persist = () => save(s0.id, st);
 
   const ev = api.eval;
-  const evalPrompt = () => { if (ev && st.current && !st.current.revealed) ev.prompt(evalTarget(st.current.spec)); };
+  // v2.10.0: 코드 구성음 평가는 실기기에서 인식이 안 돼 뺌(마이크 판정 없음)
+  const evalPrompt = () => {};
   function next() {
     if (!running()) return;
     st = R.next(st, api.elapsedMs());

@@ -4,8 +4,8 @@
 // pending: 아직 콘텐츠가 없는 자리(메뉴만 두고 "준비 중")
 
 export const STEPS = [
-  { id: 1, name: "입문", goal: "지판 음 이름·오픈 코드·4·8비트 스트럼에 익숙해지기" },
-  { id: 2, name: "초보", goal: "코드 바꾸기·펜타토닉 위치·첫 릭과 벤딩" },
+  { id: 1, name: "입문", goal: "지판 음 이름·오픈 코드와 반주·4·8비트 스트럼에 익숙해지기" },
+  { id: 2, name: "초보", goal: "트라이어드·펜타토닉 모양과 위치·첫 릭과 벤딩" },
   { id: 3, name: "초급", goal: "바레·7th 코드, 컴핑·핑거스타일, 블루스 반주 위 즉흥" },
   { id: 4, name: "중급", goal: "트라이어드·보이싱, 메이저 계열·모드, ii–V–I 릭, 청음 채보" },
   { id: 5, name: "고급", goal: "텐션·대리 코드, 모드 전환, 보이스 리딩, 프레이즈 채보" }
@@ -17,20 +17,20 @@ const P = (mod, title, note) => ({ mod, title, note, pending: true });
 
 export const COURSES = {
   1: [
-    I("notes", "n1", "note-finder", [], "지정 줄에서 음 찾기", "3~4개 줄, 제한시간 8초", { "nf.time": 8 }),
+    I("notes", "n2", "note-finder", [], "6현 전체 음 찾기", "0~15프렛, 제한시간 8초", { "nf.time": 8 }),
     I("chords", "c1", "random-chord", ["open"], "오픈 코드 잡기", "코드 이름 보고 바로 잡기, 12초", { "rc.time": 12 }),
     I("chords", "c1", "bpm-chord", ["open"], "오픈 코드 바꾸기", "60 BPM 박에 맞춰 다음 코드", { "bpm.find": 60 }),
     I("rhythm", "r1", "strum-pattern", ["4beat", "8beat"], "4·8비트 스트럼", "다운·업 기본 패턴, 70 BPM", { "rh.strum.bpm": 70 }),
-    I("scales", "pb", "shape-learning", ["minor-penta"], "마이너 펜타토닉 모양", "지판 보며 따라 치기"),
+    I("chords", "c1", "play-session", ["open"], "오픈 코드 진행 반주", "진행 따라 치기, 70 BPM", { "play.bpm": 70 }),
     I("technique", "t1", "drill", ["chromatic"], "크로매틱 1234", "왼손 1손가락 1프렛, 박 판정"),
     I("ear", "e1", "note-name", [], "음 이름 듣기", "한 음 듣고 이름 고르기")
   ],
   2: [
-    I("notes", "n2", "note-finder", [], "6현 전체 음 찾기", "0~15프렛, 제한시간 6초", { "nf.time": 6 }),
+    I("notes", "n1", "note-finder", [], "지정 줄에서 음 찾기", "무작위 순서 3~4개 줄, 제한시간 8초", { "nf.time": 8 }),
     I("chords", "c1", "random-chord", ["triad", "power"], "트라이어드·파워 코드", "메이저·마이너 트라이어드와 파워 코드", { "rc.time": 10 }),
-    I("chords", "c1", "play-session", ["open"], "오픈 코드 진행 반주", "진행 따라 치기, 70 BPM", { "play.bpm": 70 }),
     I("rhythm", "r1", "strum-pattern", ["16beat", "accent", "mute"], "16비트·악센트·뮤트", "칙 뮤트와 악센트 넣은 스트럼"),
     I("rhythm", "r1", "rhythm-reading", ["4beat", "8beat"], "리듬 읽기 4·8비트", "악보 보고 바로 치기", { "rhr.bpm": 70 }),
+    I("scales", "pb", "shape-learning", ["minor-penta"], "마이너 펜타토닉 모양", "지판 보며 따라 치기"),
     I("scales", "pb", "shape-root", ["minor-penta", "major-penta"], "펜타토닉 근음 위치", "근음 보고 모양 떠올리기"),
     I("scales", "pb", "start-note", ["minor-penta"], "펜타토닉 시작음 바꿔 치기", "정한 음에서 시작해 한 옥타브 왕복"),
     I("licks", "l1", "lick-learn", ["minor-penta"], "첫 펜타토닉 릭", "TAB·악보 보고 따라 치기"),

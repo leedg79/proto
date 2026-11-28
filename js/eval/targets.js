@@ -20,7 +20,10 @@ export function voicingTarget(label, notes, root = null) {
 export const scaleTarget = (label, rootPc, scaleId) => ({ kind: "set", label, root: mod(rootPc), pcs: (SCALES[scaleId] ? SCALES[scaleId].steps : [0, 2, 4, 5, 7, 9, 11]).map(i => mod(rootPc + i)) });
 export const pcsTarget = (label, pcs) => ({ kind: "set", label, pcs: [...new Set(pcs.map(mod))] });
 // 음 순서(TAB 위치) → 순서 대상
-export const seqTarget = (label, notes, octaveFree = false) => ({ kind: "seq", label, octaveFree, midis: notes.map(n => n.midi ?? midiAt(n.s, n.f)) });
+// 옥타브를 잘못 들은 음(저음현 배음 등)은 틀림으로 치지 않도록 기본은 음 이름만 비교
+export const seqTarget = (label, notes, octaveFree = true) => ({ kind: "seq", label, octaveFree, midis: notes.map(n => n.midi ?? midiAt(n.s, n.f)) });
+// 같은 음 이름을 need번(노트 찾기: 줄 수만큼)
+export const countTarget = (label, pc, need) => ({ kind: "count", label, pcs: [mod(pc)], need });
 export const timingTarget = (label, window = 0.1) => ({ kind: "timing", label, window });
 export const followTarget = (label, window = 0.12) => ({ kind: "follow", label, window });
 // 박 위치 이름: 1.5 → "2박 &"
@@ -30,7 +33,7 @@ export function beatLabel(at, bar = null) {
   return `${bar != null ? `${bar + 1}마디 ` : ""}${b + 1}박${sub}`;
 }
 // 릭 이벤트(realize 결과·옮긴 릭) → 순서 대상. 겹음은 맨 위 음, 벤딩은 올라가는 음까지 인정
-export function lickSeq(label, events, octaveFree = false) {
+export function lickSeq(label, events, octaveFree = true) {
   const ev = events.filter(e => !e.rest && e.notes && e.notes.length);
   const midis = ev.map(e => midiAt(e.notes[0].s, e.notes[0].f));
   const alts = ev.map((e, i) => {

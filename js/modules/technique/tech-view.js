@@ -4,7 +4,7 @@
 import * as T from "./tech-core.js";
 import { scoreSvg } from "../../render/score.js";
 import { playLick, stopLick } from "../../audio/lick-player.js";
-import { unlockAudio, getAudioContext } from "../../audio/context.js";
+import { unlockAudio, getAudioContext, withTimeout } from "../../audio/context.js";
 import { drum } from "../../audio/drums.js";
 import { masterOut } from "../../audio/sampler.js";
 import { openMic, listen, closeMic, micSupported, isMicOpen, listInputs, micInfo, setMonitor } from "../../audio/mic.js";
@@ -55,6 +55,16 @@ export function makeTechTask(level) {
     let st = store.load(s0.id) || { order: ids, n: 0, passes: 0, units: 0, lad: {}, last: null };
     const persist = () => store.save(s0.id, st);
     let x, busy = false, stopFns = [];
+    // 판정·보정 작업: 이전·다음·종료로 언제든 취소할 수 있게 번호로 관리(오디오가 멈춰도 화면이 묶이지 않음)
+    let job = 0, jobStops = [];
+    function startJob() { cancelJob(); busy = true; stopLick(); return ++job; }
+    function endJob(my) { if (my !== job) return; busy = false; jobStops.forEach(f => { try { f(); } catch (_) {} }); jobStops = []; const b = container.querySelector("#tqJudge"); if (b) b.disabled = false; }
+    function cancelJob() {
+      if (!busy) return;
+      job++; busy = false; stopLick();
+      jobStops.forEach(f => { try { f(); } catch (_) {} }); jobStops = [];
+      const b = container.querySelector("#tqJudge"); if (b) b.disabled = false;
+    }
 
     container.innerHTML = `
       <div class="nf tq">
@@ -175,13 +185,16 @@ export function makeTechTask(level) {
       if (busy || !running()) { if (!running()) api.toast("연습을 시작(재개)한 뒤 보정할 수 있음"); return; }
       if (!(await ensureMic())) return;
       stopCheck();
-      busy = true; stopLick();
+      const my = startJob();
       try {
-        await unlockAudio();
+        await withTimeout(unlockAudio(), 5000, "오디오 켜기");
+        if (my !== job) return;
         const ctx = getAudioContext();
         const energies = [], onsets = [];
         const off = listen({ onEnergy: (t, e) => energies.push([t, e]), onOnset: t => onsets.push(t) });
+        jobStops.push(off);
         setState("보정 1/3 · 조용히 1초…"); await sleep(1100);
+        if (my !== job) return;
         const floor = floorFromNoise(energies.map(x2 => x2[1]));
         setSetting("tech.floor", floor);
         await openMic(micOpts());
@@ -191,6 +204,7 @@ export function makeTechTask(level) {
         const quiet = Array.from({ length: 4 }, (_, k) => t0 + k * spb);
         quiet.forEach(t => drum("click", t, 1, masterOut(ctx)));
         await sleep((0.3 + 4 * spb) * 1000 + 200);
+        if (my !== job) return;
         const bleed = T.latencyFrom(quiet, onsets.slice(), 0.15);
         setState("보정 3/3 · 클릭 8번에 맞춰 뮤트한 줄을 피킹(첫 클릭부터)");
         onsets.length = 0;
@@ -198,13 +212,15 @@ export function makeTechTask(level) {
         const clicks = Array.from({ length: 8 }, (_, k) => t1 + k * spb);
         clicks.forEach((t, k) => drum("click", t, k % 4 === 0 ? 1 : 0.7, masterOut(ctx)));
         await sleep((1.2 + 8 * spb) * 1000 + 400);
+        if (my !== job) return;
         off();
         const r = T.latencyFrom(clicks, onsets.slice());
         if (!r) { setState(`어택을 충분히 못 잡음(${onsets.length}개). 조금 더 세게, 클릭에 맞춰 다시 보정`); return; }
         setSetting("tech.latency", Math.max(0, r.latency));
         setMic(`마이크 켜짐 · 보정 지연 ${Math.round(r.latency * 1000)}ms`);
         setState(`보정 완료 · 지연 ${Math.round(r.latency * 1000)}ms (${r.matched}/8 잡음)${bleed ? " · 스피커 클릭이 마이크에 들어감: 이어폰을 끼는 것이 정확함" : ""}`);
-      } finally { busy = false; }
+      } catch (e) { if (my === job) setState(`보정하지 못함: ${e.message}`); }
+      finally { endJob(my); }
     }
 
     async function demo() {
@@ -221,21 +237,26 @@ export function makeTechTask(level) {
       if (!running()) { api.toast("연습을 시작(재개)한 뒤 판정할 수 있음"); return; }
       if (!(await ensureMic())) return;
       stopCheck();
-      busy = true; stopLick();
+      const my = startJob();
       $("#tqJudge").disabled = true;
       try {
-        await unlockAudio();
+        await withTimeout(unlockAudio(), 5000, "오디오 켜기");
+        if (my !== job) return;
         const ctx = getAudioContext();
         const L = lad(), bpm = L.bpm, spb = 60 / bpm, n = loops();
         const startAt = ctx.currentTime + 0.25 + 4 * spb;
         const onsets = [];
         const off = window.__fretlabTechInject ? () => {} : listen({ onOnset: t => onsets.push(t) });
-        const dur = await playLick(T.loopEvents(x, n), bpm, { countIn: 4, click: true, silent: true, startAt, onEvent: () => {} });
+        jobStops.push(off);
+        const dur = await withTimeout(playLick(T.loopEvents(x, n), bpm, { countIn: 4, click: true, silent: true, startAt, onEvent: () => {} }), 30000, "클릭 준비");
+        if (my !== job) return;
         const tick = setInterval(() => {
           const now = ctx.currentTime;
           setState(now < startAt ? `준비 ${Math.max(1, Math.ceil((startAt - now) / spb))}` : `연주 중 · ${Math.min(n * x.bars, Math.floor((now - startAt) / (4 * spb)) + 1)}/${n * x.bars}마디`);
         }, 100);
-        await sleep(dur * 1000 + 350);
+        jobStops.push(() => clearInterval(tick));
+        await sleep(Math.min(dur, 120) * 1000 + 350);
+        if (my !== job) return;
         clearInterval(tick); off();
         if (!api.getActive() || !running()) { setState("일시정지되어 판정하지 않음"); return; }
         const expected = T.expectedOnsets(x, bpm, n);
@@ -259,7 +280,8 @@ export function makeTechTask(level) {
         }
         setState(res.pass ? "통과" : "다시");
         drawAll();
-      } finally { busy = false; $("#tqJudge").disabled = false; }
+      } catch (e) { if (my === job) setState(`판정하지 못함: ${e.message} · 화면 위 "오디오 다시 연결"을 누른 뒤 다시 시도`); }
+      finally { endJob(my); }
     }
 
     // 입력 확인: 8초 동안 잡힌 어택을 시간 띠에 점으로(최근 4초)
@@ -315,7 +337,7 @@ export function makeTechTask(level) {
     };
     stopFns.push(stopCheck);
 
-    function go(d) { if (busy) return; stopLick(); st = { ...st, n: (st.n + d + st.order.length) % st.order.length }; persist(); load(); drawAll(); setState(""); }
+    function go(d) { if (busy) { cancelJob(); setState("판정 취소"); } stopLick(); st = { ...st, n: (st.n + d + st.order.length) % st.order.length }; persist(); load(); drawAll(); setState(""); }
     $("#tqJudge").onclick = runJudge;
     $("#tqDemo").onclick = demo;
     $("#tqCal").onclick = calibrate;
@@ -329,7 +351,7 @@ export function makeTechTask(level) {
     });
     load(); drawAll(); persist();
     if (window.__fretlabTechInject) setMic("시험용 입력");
-    return () => { stopLick(); stopFns.forEach(f => f()); if (meterTimer) clearInterval(meterTimer); if (!(api.eval && api.eval.isOn())) closeMic(); };
+    return () => { cancelJob(); stopLick(); stopFns.forEach(f => f()); if (meterTimer) clearInterval(meterTimer); if (!(api.eval && api.eval.isOn())) closeMic(); };
   }
 
   return { settingsHtml, bindSettings, readSettings, mount, clearFinder: () => store.clear() };

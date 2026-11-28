@@ -20,6 +20,8 @@ import * as ScaleMode from "./modules/scales/mode-view.js";
 import * as ScaleTransition from "./modules/scales/transition-view.js";
 import { renderDictionary } from "./modules/chords/dictionary-view.js";
 import * as LickLearn from "./modules/licks/learn-view.js";
+import * as LickOne from "./modules/licks/one-view.js";
+import { renderLickHome, renderLickBasic, renderLickGenre, renderLickAll } from "./modules/licks/browse-view.js";
 import * as GenreComping from "./modules/chords/comping-view.js";
 import * as ChordScale from "./modules/scales/chordscale-view.js";
 import { LickMove, LickVary, LickBacking } from "./modules/licks/apply-view.js";
@@ -35,12 +37,12 @@ import { makeEarTask } from "./modules/ear/ear-view.js";
 import * as RhythmReading from "./modules/rhythm/reading-view.js";
 import * as RhythmPhrase from "./modules/rhythm/phrase-view.js";
 import { strum, loadInstrument } from "./audio/sampler.js";
-import { unlockAudio } from "./audio/context.js";
+import { unlockAudio, audioHealth, resetAudio } from "./audio/context.js";
 import * as Ev from "./eval/evaluator.js";
-import { micLevel } from "./audio/mic.js";
+import { micLevel, isMicOpen } from "./audio/mic.js";
 import { summary as evalSummary, summaryText as evalText } from "./eval/eval-core.js";
 
-const APP_VERSION = "2.9.0";
+const APP_VERSION = "2.10.0";
 
 // 구현된 과제의 연습 화면 (모듈/과제 → 화면 모듈)
 // 화면 모듈: settingsHtml, bindSettings, readSettings, mount, clearFinder
@@ -55,6 +57,7 @@ const CONTENT = {
   "scales/mode-switch": ScaleMode,
   "scales/neck-transition": ScaleTransition,
   "licks/lick-learn": LickLearn,
+  "licks/lick-one": LickOne,
   "chords/genre-comping": GenreComping,
   "scales/chord-scale": ChordScale,
   "licks/lick-move": LickMove,
@@ -168,12 +171,15 @@ function parseRoute() {
 function parentOf(parts) {
   const [a, b, c, d] = parts;
   if (a === "m") {
+    if (b === "licks" && d === "lick-one") return Store.getSetting("lk.from", `m/licks/${c}`);
+    if (b === "licks" && ["l1", "l2", "l3", "l4", "l5", "l6"].includes(c) && !d) return "m/licks/basic";
     if (d) return `m/${b}/${c}`;
     if (c) return `m/${b}`;
     return "";
   }
   if (a === "session") {
     const s = S.getActive();
+    if (s && s.module === "licks" && s.task === "lick-one") return Store.getSetting("lk.from", `m/licks/${s.level}`);
     return s ? `m/${s.module}/${s.level}` : "";
   }
   if (a === "journal") {
@@ -390,6 +396,7 @@ function openCourseItem(step, idx) {
 function renderLevels(modId) {
   const m = findModule(modId);
   if (!m) { go("", { replace: true }); return null; }
+  if (modId === "licks") return renderLickHome(view, { go });
   view.innerHTML = `
     <div class="page-head">
       <div class="eyebrow">${esc(m.name)} · 레벨 선택</div>
@@ -409,6 +416,11 @@ function renderLevels(modId) {
 
 // ───────────── 과제 선택 ─────────────
 function renderTasks(modId, lvlId) {
+  if (modId === "licks") {
+    if (lvlId === "basic") return renderLickBasic(view, { go });
+    if (lvlId === "all") return renderLickAll(view, { go });
+    if (lvlId.startsWith("g-")) return renderLickGenre(view, lvlId.slice(2), { go });
+  }
   const m = findModule(modId), l = findLevel(modId, lvlId);
   if (!m || !l) { go(`m/${modId}`, { replace: true }); return null; }
   view.innerHTML = `
@@ -418,7 +430,7 @@ function renderTasks(modId, lvlId) {
       <p>${esc(l.desc)}</p>
     </div>
     <div class="list">
-      ${l.tasks.map(t => `
+      ${l.tasks.filter(t => !t.hidden).map(t => `
         <button class="list-item" type="button" data-task="${t.id}">
           <div class="txt"><b>${esc(t.name)}</b><span>${esc(t.unit.label)}</span></div>
           <span class="tag">${esc(SESSION_TYPES[t.type] || t.type)}</span>
@@ -540,35 +552,64 @@ function renderTask(modId, lvlId, taskId) {
 // ───────────── 진행 중 세션 화면 ─────────────
 // 연주 평가를 붙일 수 있는 모듈(Notes ~ Technique)
 const EVAL_MODULES = ["notes", "chords", "rhythm", "scales", "licks", "technique"];
+// 마이크 판정이 없는 과제(v2.10.0: 코드 구성음 평가 삭제)
+const NO_EVAL = new Set(["chords/random-chord", "chords/bpm-chord", "chords/play-session", "chords/genre-comping"]);
+// 마이크(연주 평가) 기본 켬. 세션 화면 버튼으로 바꾼 값을 기억함
+const micWanted = s => {
+  const o = (s && s.options) || {};
+  if (o.mic === "on") return true;
+  if (o.mic === "off") return false;
+  return Store.getSetting("eval.on", !window.__fretlabMicDefaultOff);
+};
+async function micOn() {
+  if (Ev.isOn()) return true;
+  try {
+    if (window.__fretlabEvalFake) Ev._test.enableFake(); else await Ev.enable();
+    return true;
+  } catch (e) { toast("마이크를 켤 수 없음: " + (e.message || e.name)); return false; }
+}
 
-function bindEvalPanel() {
+// 마이크 버튼(세션 바)·평가 시트·연습 화면 위 입력 표시(막대·들린 음·판정 문구)
+function bindEvalPanel(wantRef) {
   const sw = $("#evalSwitch");
   const draw = () => {
-    sw.textContent = Ev.isOn() ? "ON" : "OFF"; sw.classList.toggle("on", Ev.isOn());
-    const c = $("#evalChip"); if (c) { c.querySelector("span").textContent = Ev.isOn() ? "평가 ON" : "평가 OFF"; c.classList.toggle("sel", Ev.isOn()); }
-    const l = $("#evalLast"); if (l) l.classList.toggle("hidden", !Ev.isOn());
+    const on = Ev.isOn();
+    if (sw) { sw.textContent = on ? "ON" : "OFF"; sw.classList.toggle("on", on); }
+    const c = $("#evalChip"); if (c) { c.querySelector("span").textContent = on ? "마이크 ON" : wantRef.want && !on ? "마이크 켜는 중" : "마이크 OFF"; c.classList.toggle("sel", on); c.setAttribute("aria-pressed", on ? "true" : "false"); }
+    const b = $("#evalBox"); if (b) b.classList.toggle("hidden", !on);
   };
   const off = Ev.onChange(({ text, kind }) => {
     const el = $("#evalLast"); if (!el) return;
-    el.textContent = text; el.className = "eval-last " + (kind || "") + (Ev.isOn() ? "" : " hidden");
+    el.textContent = text; el.className = "eb-msg " + (kind || "");
   });
   onCleanup(off);
-  sw.onclick = async () => {
-    if (Ev.isOn()) { Ev.disable(); Store.setSetting("eval.on", false); draw(); return; }
-    try {
-      if (window.__fretlabEvalFake) Ev._test.enableFake(); else await Ev.enable();
-      Store.setSetting("eval.on", true);
-      $("#evalHeard").textContent = window.__fretlabEvalFake ? "테스트 입력" : `입력: ${Ev.inputLabel()}`;
-    } catch (e) { toast("마이크를 켤 수 없음: " + (e.message || e.name)); }
+  const toggle = async () => {
+    if (Ev.isOn()) { Ev.disable(); wantRef.want = false; Store.setSetting("eval.on", false); draw(); return; }
+    wantRef.want = true; Store.setSetting("eval.on", true); draw();
+    if (await micOn()) { const h = $("#evalHeard"); if (h) h.textContent = window.__fretlabEvalFake ? "테스트 입력" : `입력: ${Ev.inputLabel()}`; }
+    else wantRef.want = false;
     draw();
   };
+  if (sw) sw.onclick = toggle;
+  if ($("#evalChip")) $("#evalChip").onclick = toggle;
+  wantRef.draw = draw;
   const t = setInterval(() => {
     const h = Ev.heard();
-    if (Ev.isOn() && h) $("#evalHeard").textContent = `들린 음 ${h.name}`;
-    const m = $("#evalMeter"); if (m) m.style.width = Ev.isOn() ? Math.min(100, Math.sqrt(micLevel()) * 2500) + "%" : "0%";
+    const on = Ev.isOn();
+    if (on && h) { const e = $("#evalHeard"); if (e) e.textContent = `들린 음 ${h.name}`; const n = $("#ebHeard"); if (n) n.textContent = h.name; }
+    const w = on ? Math.min(100, Math.sqrt(micLevel()) * 2500) + "%" : "0%";
+    const m = $("#evalMeter"); if (m) m.style.width = w;
+    const m2 = $("#ebMeter"); if (m2) m2.style.width = w;
+    const d = $("#audioDiag"); if (d) d.textContent = audioDiagText();
   }, 120);
   onCleanup(() => clearInterval(t));
   draw();
+}
+function audioDiagText() {
+  const h = audioHealth();
+  const inp = Ev.isOn() || isMicOpen() ? Ev.inputLabel() || "기본 입력" : "꺼짐";
+  if (!h.exists) return `오디오: 아직 안 켬 · 입력: ${inp}`;
+  return `오디오: ${h.state === "running" ? (h.flowing ? "정상" : "멈춤(시계 안 흐름)") : h.state} · ${h.sampleRate}Hz · 다시 연결 ${h.resets}회 · 입력: ${inp}`;
 }
 
 function renderSession() {
@@ -600,13 +641,14 @@ function renderSession() {
             <div class="seg" id="beatSeg">${[2, 3, 4, 6].map(n => `<button type="button" data-beats="${n}" class="${n === metro.beats ? "sel" : ""}">${n}/4</button>`).join("")}</div>
           </div>
         </div>`;
-  const evalable = !!content && EVAL_MODULES.includes(s0.module);
+  const evalable = !!content && EVAL_MODULES.includes(s0.module) && !NO_EVAL.has(`${s0.module}/${s0.task}`);
   const evalPanel = evalable ? `
         <div class="panel eval-panel" id="evalPanel">
           <div class="metro-top"><h3>연주 평가 <small class="muted">마이크</small></h3><button class="switch" id="evalSwitch" type="button">OFF</button></div>
           <div class="eval-meter"><i id="evalMeter"></i></div>
-          <div class="eval-heard muted small" id="evalHeard">켜면 마이크(또는 고른 입력 장치)로 연주를 듣고 문제마다 판정함. 결과는 연습 화면 위쪽 한 줄에 나옴</div>
+          <div class="eval-heard muted small" id="evalHeard">마이크(또는 고른 입력 장치)로 연주를 듣고 문제마다 판정함. 세션 바의 마이크 버튼으로 바로 켜고 끔</div>
           <div class="eval-sum muted small" id="evalSum"></div>
+          <div class="muted small" id="audioDiag" style="margin-top:8px"></div>
         </div>` : "";
   const tagsHtml = s => `<span class="tag accent">${esc(SESSION_TYPES[s.type] || s.type)}</span>${(s.topics || []).map(id => `<span class="tag">${esc(topicLabel(s.module, s.level, s.task, [id]))}</span>`).join("")}`;
   const head = `
@@ -631,7 +673,7 @@ function renderSession() {
   view.innerHTML = content ? `
     <div class="sess content-layout">
       <div class="sess-bar">
-        <div class="sess-name"><small>${esc(levelName(s0.module, s0.level))}</small><b>${esc(taskName(s0.module, s0.level, s0.task).split(" · ")[0])}</b></div>
+        <div class="sess-name"><small>${esc(levelName(s0.module, s0.level))}</small><b>${esc(s0.task === "lick-one" && s0.options && s0.options.lickId ? `릭 ${s0.options.lickId}` : taskName(s0.module, s0.level, s0.task).split(" · ")[0])}</b></div>
         <div class="sess-clock"><i class="sc-dot" id="stateDot"></i><span id="bigTime">00:00</span><span class="state-label sr" id="stateLabel">READY</span></div>
         <button class="btn warn" id="pauseBtn" type="button">일시정지</button>
         <button class="btn danger" id="endBtn" type="button">종료</button>
@@ -639,10 +681,13 @@ function renderSession() {
       <div class="sess-strip">
         <span class="ss-units">완료 <b id="unitCount">0</b>회</span>
         <span class="ss-tags" id="sessTags">${tagsHtml(s0)}</span>
-        ${evalable ? `<button class="chip ss-chip" id="evalChip" type="button" aria-label="연주 평가 설정 열기">${MIC_ICON}<span>평가 OFF</span></button>` : ""}
+        ${evalable ? `<button class="chip ss-chip mic-chip" id="evalChip" type="button" aria-label="마이크 켜고 끄기" aria-pressed="false">${MIC_ICON}<span>마이크 OFF</span></button>` : ""}
         <button class="chip ss-chip" id="openSettings" type="button" aria-label="세션 설정 열기">${SLIDERS_ICON}<span>설정</span></button>
       </div>
-      ${evalable ? `<div class="eval-last hidden" id="evalLast"></div>` : ""}
+      ${evalable ? `<div class="eval-box hidden" id="evalBox" aria-live="polite">
+        <div class="eb-top"><span class="eb-meter" aria-hidden="true"><i id="ebMeter"></i></span><span class="eb-heard">들린 음 <b id="ebHeard">-</b></span></div>
+        <div class="eb-msg" id="evalLast">마이크 켜짐 · 문제가 나오면 판정 시작</div>
+      </div>` : ""}
       ${gate}
       <div class="content-panel" id="contentArea"></div>
     </div>
@@ -707,13 +752,16 @@ function renderSession() {
       if (tb) openSheet(tb.dataset.tab);
     });
     $("#openSettings").onclick = () => openSheet("set");
-    if ($("#evalChip")) $("#evalChip").onclick = () => openSheet("eval");
   }
   Ev.setSink(r => S.recordEval(r));
   mountContent();
   onCleanup(() => { if (unmount) try { unmount(); } catch (_) {} });
-  if (evalable) bindEvalPanel();
+  const mic = { want: evalable && micWanted(s0) };
+  if (evalable) bindEvalPanel(mic);
   onCleanup(() => { if (Ev.isOn()) Ev.disable(); Ev.end(); });
+  // 마이크 기본 켬: "연습 시작"(터치) 때 켬. 이미 진행 중인 세션 화면에 다시 들어오면 바로 켬
+  const micAtStart = async () => { if (evalable && mic.want && !Ev.isOn()) { await micOn(); if (mic.draw) mic.draw(); } };
+  if (S.getActive().status !== "ready") micAtStart();
 
   if (content) {
     content.bindSettings($("#liveForm"));
@@ -732,10 +780,12 @@ function renderSession() {
     };
   }
 
-  $("#practiceStart").onclick = () => {
+  $("#practiceStart").onclick = async () => {
     S.beginPractice();
     holdScreen(true);
     paint();
+    // 마이크를 먼저 연 뒤 반주를 시작(마이크를 여는 순간 아이폰 오디오 경로가 바뀌어 재생이 끊기는 것을 피함)
+    if (evalable && mic.want && !Ev.isOn()) { unlockAudio(); await micAtStart(); }
     autostart();
   };
 
@@ -1271,6 +1321,21 @@ async function boot() {
   dock.onclick = () => go("session");
   dock.onkeydown = e => { if (e.key === "Enter") go("session"); };
   window.addEventListener("hashchange", render);
+  // 오디오 멈춤 안내: 소리를 한 번 낸 뒤 시계가 안 흐르면(아이폰 마이크·USB 장치 전환 등) 세션·백킹 화면 위에 띄움
+  const banner = $("#audioBanner");
+  setInterval(() => {
+    const where = parseRoute()[0];
+    const show = document.visibilityState === "visible" && (where === "session" || where === "jam") && audioHealth().stalled;
+    banner.classList.toggle("hidden", !show);
+  }, 1000);
+  $("#audioFix").onclick = async () => {
+    $("#audioFix").disabled = true;
+    try {
+      await resetAudio();
+      const h = audioHealth();
+      toast(h.state === "running" ? "오디오를 다시 연결함 · 재생 버튼을 다시 누름" : "다시 연결하지 못함 · 앱을 완전히 닫았다 다시 열어야 함");
+    } finally { $("#audioFix").disabled = false; }
+  };
   if (!location.hash) history.replaceState(null, "", "#/");
   if (parseRoute()[0] === "session") history.replaceState(null, "", "#/");
   render();
@@ -1284,4 +1349,4 @@ async function boot() {
 boot();
 
 // 테스트에서 상태 확인용
-window.__fretlab = { S, Store, Metro, version: APP_VERSION };
+window.__fretlab = { S, Store, Metro, Ev, audioHealth, version: APP_VERSION };

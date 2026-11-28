@@ -5,7 +5,7 @@ import * as F from "./finder-core.js";
 import { positionsOf } from "../../theory/notes.js";
 import { fretboardSvg } from "../../render/fretboard.js";
 import { getSetting, setSetting } from "../../core/storage.js";
-import { midisOf } from "../../eval/targets.js";
+import { countTarget } from "../../eval/targets.js";
 
 const KEY = "fretlab:nf";
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -84,13 +84,14 @@ export function mount(container, api) {
   const running = () => { const s = api.getActive(); return !!s && s.status === "running"; };
 
   function persist() { save(s0.id, st); }
-  // 연주 평가: 문제 음(고른 줄·0~15프렛 안의 위치)이 잡히면 통과, 다른 음은 실수
+  // 연주 평가: 문제 음을 줄 수만큼(6현 = 6번, 3~4현 = 줄 수) 치면 통과
+  //  시간 = 첫 어택 ~ 마지막 맞은 어택, 정확도 = 맞은 음 ÷ 친 음. 마이크로는 어느 줄인지 구분할 수 없어 줄은 판정하지 않음
   const ev = api.eval;
   function evalPrompt() {
     const c = st.current;
     if (!ev || !c || c.revealed) return;
-    const strings = c.strings.length ? c.strings : [1, 2, 3, 4, 5, 6];
-    ev.prompt({ kind: "note", label: c.name + (c.strings.length ? ` (${c.strings.join("·")}번 현)` : ""), midis: midisOf(positionsOf(c.pc, strings, 15)) });
+    const need = c.strings.length || 6;
+    ev.prompt(countTarget(c.name + (c.strings.length ? ` (${c.strings.join("·")}번 현)` : " (6현)"), c.pc, need));
   }
 
   function next() {

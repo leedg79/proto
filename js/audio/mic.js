@@ -1,6 +1,6 @@
 // 마이크 열기 + 어택 감지. 재생과 같은 오디오 시계(AudioContext.currentTime)로 시각을 잼
 // iPhone: 마이크를 쓰는 동안 오디오 세션을 "play-and-record"로 바꿔야 입력이 들어옴
-import { unlockAudio, getAudioContext, setRecordMode, audioSessionAuto } from "./context.js";
+import { unlockAudio, getAudioContext, setRecordMode, audioSessionAuto, onAudioReset, withTimeout } from "./context.js";
 import { OnsetDetector, blockEnergy } from "./onset-core.js";
 
 let mic = null;
@@ -55,7 +55,7 @@ export async function openMic({ floor = 2e-6, minGap = 0.05, ratio = 4, deviceId
     for (const h of m.handlers) { if (h.onEnergy) h.onEnergy(t, e); if (hit != null && h.onOnset) h.onOnset(hit); }
   };
   if (ctx.audioWorklet && window.AudioWorkletNode) {
-    await ctx.audioWorklet.addModule(new URL("./onset-worklet.js", import.meta.url));
+    await withTimeout(ctx.audioWorklet.addModule(new URL("./onset-worklet.js", import.meta.url)), 5000, "입력 분석기 준비");
     const node = new AudioWorkletNode(ctx, "onset-energy", { numberOfInputs: 1, numberOfOutputs: 1, channelCount: 1 });
     node.port.onmessage = ev => { const a = ev.data; for (let i = 0; i < a.length; i += 2) feed(a[i], a[i + 1]); };
     src.connect(node); node.connect(mute);
@@ -100,6 +100,9 @@ export const listenerCount = () => (mic ? mic.handlers.size : 0);
 export const micLevel = () => (mic ? mic.level : 0);
 export const isMicOpen = () => !!mic;
 
+// 오디오 컨텍스트를 새로 만들면 옛 입력 연결은 못 씀 → 닫고, 평가기가 다시 엶
+onAudioReset(() => { if (mic) { const keepRec = recordModeOn(); closeMic(); if (keepRec) setRecordMode(true); } });
+const recordModeOn = () => !!mic;
 export function closeMic() {
   if (!mic) return;
   try { if (mic.monitor) mic.monitor.disconnect(); mic.node.disconnect(); mic.src.disconnect(); } catch (_) {}

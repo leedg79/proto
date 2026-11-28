@@ -1,12 +1,15 @@
 // 릭 재생: 이벤트(틱, 4분음표 = 12)를 기타 샘플로 연주. 셔플 릭은 8분음표 뒤쪽을 셋잇단 위치로
-import { unlockAudio, getAudioContext } from "./context.js";
+import { unlockAudio, getAudioContext, onAudioReset } from "./context.js";
 import { loadInstrument, playNote, masterOut } from "./sampler.js";
 import { drum } from "./drums.js";
 import { TUNING } from "../theory/notes.js";
 
 let timers = [];
+// 틱(4분음표 = 12) → 박 위치. 셔플 릭은 8분음표 뒤쪽을 셋잇단 위치로
+export function beatAt(lick, tick) { const beat = tick / 12; if (lick.feel !== "shuffle") return beat; const w = Math.floor(beat), f = beat - w; return Math.abs(f - 0.5) < 1e-6 ? w + 2 / 3 : beat; }
 let playing = null;
 
+onAudioReset(() => stopLick());
 export function stopLick() { timers.forEach(clearTimeout); timers = []; if (playing) playing.forEach(s => { try { s.stop(); } catch (_) {} }); playing = null; }
 
 // lick: realize() 결과(events, feel), onEvent(i | -1 끝)

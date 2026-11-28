@@ -95,6 +95,11 @@ const LICK_TASKS = [
   { id: "lick-vary", name: "변형하기 · Variation", type: "finding", unit: { kind: "count", size: 10, label: "10개 = 1회" } }
 ];
 
+// 릭 1개 연습(v2.10.0): 기본 릭 모음·장르·전체 목록에서 릭을 골라 들어감(과제 목록에는 안 보임)
+export const LICK_ONE = { id: "lick-one", name: "릭 연습 · Lick Practice", type: "lick", unit: { kind: "count", size: 1, label: "끝까지 3번 = 1회 (판정 켜면 통과 2번 = 1회)" }, hidden: true };
+// 장르 메뉴(이름만, 기타리스트는 licks/genre-data.js)
+export const LICK_GENRES = [["blues", "블루스"], ["neosoul", "네오소울"], ["rnb", "R&B"], ["pop", "팝"], ["funk", "펑크"], ["rock", "록"], ["metal", "메탈"], ["jazz", "재즈"]];
+
 const MY_LICK_TASKS = [
   { id: "my-edit", name: "릭 입력·편집 · My Lick Editor", type: "reference", unit: UNIT.listOnly, reference: true },
   ...LICK_TASKS
@@ -114,12 +119,13 @@ export const MODULES = [
     sub: "지판 음 위치 찾기",
     stage: 2,
     levels: [
+      // v2.10.0: 쉬운 6현 전체를 먼저(N1), 정해진 줄에서 찾는 무작위 3~4현을 다음(N2)으로. 저장 기록과 맞도록 아이디(n2·n1)는 그대로 둠
       {
-        id: "n1", name: "N1 무작위 3~4현", desc: "지정된 현에서 음 위치 찾기",
+        id: "n2", name: "N1 전체 6현", desc: "6현 전체(0~15프렛) 음 위치 찾기",
         tasks: [{ id: "note-finder", name: "Note Finder", type: "finding", unit: UNIT.noteCycle, implemented: true }]
       },
       {
-        id: "n2", name: "N2 전체 6현", desc: "6현 전체(0~15프렛) 음 위치 찾기",
+        id: "n1", name: "N2 무작위 3~4현", desc: "무작위 순서로 정해진 3~4개 줄에서 음 위치 찾기",
         tasks: [{ id: "note-finder", name: "Note Finder", type: "finding", unit: UNIT.noteCycle, implemented: true }]
       }
     ]
@@ -179,9 +185,14 @@ export const MODULES = [
   {
     id: "licks",
     name: "Licks",
-    sub: "펜타 · 메이저/마이너 · 모드 · 진행 · 코드톤 · 블루스",
+    sub: "기본 릭 · 장르별 기타리스트 스타일 · 전체 목록",
     stage: 5,
-    levels: LICK_LEVELS.map(l => ({ id: l.id, name: l.name, desc: l.desc, tasks: l.id === "l7" ? MY_LICK_TASKS : LICK_TASKS }))
+    levels: [
+      ...LICK_LEVELS.map(l => ({ id: l.id, name: l.name, desc: l.desc, tasks: l.id === "l7" ? MY_LICK_TASKS : LICK_TASKS })),
+      // 아래는 릭 홈에서 들어가는 메뉴(레벨 목록 화면에는 따로 그림)
+      { id: "basic", name: "기본 릭 모음", desc: "기존 릭 135개를 난이도 순서로", hidden: true, tasks: [LICK_ONE] },
+      ...LICK_GENRES.map(([id, name]) => ({ id: `g-${id}`, name, desc: `${name} 기타리스트 스타일 릭`, hidden: true, genre: id, tasks: [LICK_ONE] }))
+    ]
   },
   {
     id: "technique",
@@ -294,6 +305,8 @@ const LEVEL_TOPICS = {
 };
 
 const TASK_TOPICS = {
+  "licks/basic/lick-one": [],
+  ...Object.fromEntries(LICK_GENRES.map(([id]) => [`licks/g-${id}/lick-one`, []])),
   "scales/pb/chord-scale": tp([["blues-minor", "12마디 블루스 · 마이너 펜타 유지"], ["blues-chord", "12마디 블루스 · 코드마다 메이저 펜타"], ["minor-blues", "마이너 블루스"], ["pop-major", "팝 I–V–vi–IV"]]),
   "scales/mm/chord-scale": tp([["major251", "메이저 ii–V–I"], ["1625", "I–vi–ii–V"], ["minor251", "마이너 ii–V–i(내추럴↔하모닉)"], ["minor-blues-nm", "마이너 블루스"]]),
   "scales/md/chord-scale": tp([["251-modes", "ii–V–I 모드 전환"], ["1625-modes", "I–vi–ii–V 모드 전환"], ["dorian-vamp", "도리안 뱀프"], ["mixo-vamp", "믹솔리디안 뱀프"]]),

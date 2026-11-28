@@ -140,3 +140,33 @@ test("세션 누적·요약·기록 저장", () => {
 test("note 대상 허용 위치", () => {
   assert.deepEqual(midisOf([{ s: 6, f: 0 }, { s: 1, f: 0 }, { s: 5, f: 7 }]).sort(), [40, 52, 64].sort());
 });
+
+test("count 대상(노트 찾기): 같은 음 이름 6번, 첫 어택~마지막 맞은 어택 시간, 정확도", async () => {
+  const { countTarget } = await import("../js/eval/targets.js");
+  const E = await import("../js/eval/eval-core.js");
+  let a = E.startAttempt(countTarget("C (6현)", 0, 6), 10);
+  const hits = [[48, 11], [60, 11.5], [61, 11.8], [60, 12.1], [72, 12.6], [60, 13], [72, 13.4]];
+  let last = null;
+  for (const [m, t] of hits) { const r = E.feedNote(a, m, t); a = r.a; last = r.event; }
+  assert.equal(last, "ok");
+  const r = E.finishAttempt(a, 14);
+  assert.equal(r.ok, true);
+  assert.equal(r.timeMs, 2400);          // 11 → 13.4 (출제 시각 10과 무관)
+  assert.ok(Math.abs(r.score - 6 / 7) < 1e-9);
+  assert.deepEqual(r.mistakes, ["C#4"]);
+  // 못 채우면 미통과 + 남은 음 수
+  let b = E.startAttempt(countTarget("D", 2, 4), 0);
+  b = E.feedNote(b, 50, 1).a; b = E.feedNote(b, 62, 2).a;
+  const rb = E.finishAttempt(b, 3);
+  assert.equal(rb.ok, false); assert.deepEqual(rb.mistakes, ["2음 못 침"]); assert.equal(rb.score, 0.5);
+});
+
+test("순서 대상은 기본으로 옥타브 오인식을 틀림으로 치지 않음", async () => {
+  const { seqTarget } = await import("../js/eval/targets.js");
+  const E = await import("../js/eval/eval-core.js");
+  let a = E.startAttempt(seqTarget("A 마이너 펜타", [{ s: 6, f: 5 }, { s: 6, f: 8 }]), 0);
+  a = E.feedNote(a, 45 + 12, 1).a;   // 한 옥타브 위로 들림
+  const r = E.feedNote(a, 48, 2);
+  assert.equal(r.event, "ok");
+  assert.equal(E.finishAttempt(r.a, 3).ok, true);
+});

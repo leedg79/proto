@@ -2,7 +2,7 @@
 // 음원: FluidR3 GM 사운드폰트(gleitz/midi-js-soundfonts 변환본)에서 3반음 간격으로 뽑은 mp3. 사이 음은 재생 속도로 맞춤
 // 벤딩·릴리스·슬라이드·비브라토는 재생 속도(음높이) 자동 변화로 표현
 
-import { getAudioContext, unlockAudio } from "./context.js";
+import { getAudioContext, unlockAudio, withTimeout } from "./context.js";
 
 const BASE = "./sounds/";
 let index = null;
@@ -11,19 +11,20 @@ const loading = {};
 let master = null;
 
 export function masterOut(ctx) {
-  if (!master) { master = ctx.createGain(); master.gain.value = 0.9; master.connect(ctx.destination); }
+  if (!master || master.context !== ctx) { master = ctx.createGain(); master.gain.value = 0.9; master.connect(ctx.destination); }
   return master;
 }
 
 async function getIndex() {
-  if (!index) index = await (await fetch(BASE + "index.json")).json();
+  if (!index) index = await withTimeout(fetch(BASE + "index.json").then(r => r.json()), 15000, "음원 목록 불러오기");
   return index;
 }
 
 export async function loadInstrument(inst) {
   if (buffers[inst]) return buffers[inst];
   if (loading[inst]) return loading[inst];
-  loading[inst] = (async () => {
+  // 실패하면(시간 초과 포함) 다음에 다시 시도할 수 있게 기억을 지움
+  loading[inst] = withTimeout((async () => {
     const ctx = await unlockAudio();
     const idx = await getIndex();
     const map = new Map();
@@ -34,7 +35,7 @@ export async function loadInstrument(inst) {
     }));
     buffers[inst] = map;
     return map;
-  })();
+  })(), 25000, "음원 불러오기").catch(e => { delete loading[inst]; throw e; });
   return loading[inst];
 }
 

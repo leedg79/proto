@@ -3,6 +3,7 @@
 import { SCALES, blocks, keyName, scaleTitle } from "../../theory/scales.js";
 import { TUNING } from "../../theory/notes.js";
 import { LICK_SETS } from "./lick-data.js";
+import { GENRES, GENRE_LICK_ROWS, DIFF_NAMES } from "./genre-data.js";
 import { LICK_LEVELS } from "../../data/catalog.js";
 
 const mod = n => ((n % 12) + 12) % 12;
@@ -84,13 +85,44 @@ export function setCustomLicks(rows) {
   LICKS.splice(BUILTIN, LICKS.length - BUILTIN);
   for (const r of rows) { try { LICKS.push(buildLick(r)); } catch (_) {} }
 }
-export const lickById = id => LICKS.find(l => l.id === id) || null;
+
+// ── 장르·기타리스트 릭 (genre-data.js) ──
+const PLAYER = Object.fromEntries(GENRES.flatMap(g => g.players.map(p => [`${g.id}/${p.id}`, { ...p, genre: g.id, genreName: g.name }])));
+export const playerOf = l => (l && l.genreLick ? PLAYER[`${l.genre}/${l.player}`] || null : null);
+// 장르 릭 한 줄 → 릭 객체(기본 릭과 같은 모양 + genre·player·diff)
+export function buildGenreLick(row) {
+  const [id, genre, player, diff, scale, key, use, feel, notesStr, chordStr, name, note] = row;
+  const events = notesStr.split(" ").map(parseToken);
+  let t = 0;
+  for (const e of events) { e.at = t; t += e.dur; }
+  return { id, sub: player, level: `g-${genre}`, genre, player, diff: Math.max(1, Math.min(3, Number(diff) || 1)), scale, key, use, feel, events, chords: parseChords(chordStr), ticks: t, bars: Math.ceil(t / BAR), name: name || "", note: note || "", custom: false, genreLick: true };
+}
+export const GENRE_LICKS = [];
+export function setGenreRows(rows) {
+  GENRE_LICKS.splice(0, GENRE_LICKS.length);
+  for (const r of rows) { try { GENRE_LICKS.push(buildGenreLick(r)); } catch (e) { console.warn("장르 릭 해석 실패", r[0], e.message); } }
+}
+setGenreRows(GENRE_LICK_ROWS);
+export { GENRES, DIFF_NAMES };
+// 장르·기타리스트·난이도로 고르기(빈 값 = 전체)
+export function genreLicks({ genre = null, player = null, diff = null } = {}) {
+  return GENRE_LICKS.filter(l => (!genre || l.genre === genre) && (!player || l.player === player) && (!diff || l.diff === Number(diff)));
+}
+// 기본 릭 모음: 내장 릭만, 난이도 → 분류 순서 → 번호
+const LEVEL_ORDER = Object.fromEntries(LICK_LEVELS.map((l, i) => [l.id, i]));
+export function basicLicksSorted() {
+  return LICKS.filter(l => !l.custom).map((l, i) => ({ l, i, d: difficultyOf(l) })).sort((a, b) => a.d - b.d || (LEVEL_ORDER[a.l.level] ?? 99) - (LEVEL_ORDER[b.l.level] ?? 99) || a.i - b.i).map(x => x.l);
+}
+export const allLicks = () => [...LICKS, ...GENRE_LICKS];
+export const lickById = id => LICKS.find(l => l.id === id) || GENRE_LICKS.find(l => l.id === id) || null;
+export const lickDifficulty = l => (l.diff != null ? l.diff : difficultyOf(l));
 
 // 검사: 길이 2마디 이내, 음은 스케일(코드 구간은 코드 스케일) 안 또는 경과음 표시, 벤딩 목표음도 스케일 안,
 // 해머·풀·슬라이드·릴리스는 같은 줄에서 방향이 맞아야 함
 export function validate(l) {
   const errs = [];
-  const maxBars = l.custom ? 4 : 2;
+  const maxBars = l.custom || l.genreLick ? 4 : 2;
+  const maxFret = l.genreLick ? 24 : 17;
   if (l.ticks > maxBars * BAR) errs.push(`길이 ${l.ticks / BAR}마디 > ${maxBars}마디`);
   let prev = null;
   for (const e of l.events) {
@@ -101,7 +133,7 @@ export function validate(l) {
     // 코드가 있어도 키 스케일 음은 허용
     if (ch) for (const x of stepsOf(l.scale)) allowed.add(mod(l.key + x));
     for (const n of e.notes) {
-      if (n.s < 1 || n.s > 6 || n.f < 0 || n.f > 17) errs.push(`${n.s}-${n.f} 범위 밖`);
+      if (n.s < 1 || n.s > 6 || n.f < 0 || n.f > maxFret) errs.push(`${n.s}-${n.f} 범위 밖`);
       const pc = mod(midiOf(n.s, n.f));
       if (!e.chrom && !e.rel && !allowed.has(pc)) errs.push(`${n.s}-${n.f} 스케일 밖`);
       if (e.bend && !allowed.has(mod(pc + e.bend))) errs.push(`${n.s}-${n.f} 벤딩 목표음 스케일 밖`);
@@ -175,7 +207,7 @@ export function realize(l, toKey = l.key) {
     shape, rootString, rootFret,
     land: last ? (last.bendDeg || last.cdeg || last.deg) : "-",
     lo: Math.min(...fr), hi: Math.max(...fr),
-    difficulty: difficultyOf(l)
+    difficulty: l.diff != null ? l.diff : difficultyOf(l)
   };
 }
 

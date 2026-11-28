@@ -834,3 +834,38 @@ body.has-dock main { padding-bottom: calc(110px + var(--safe-bottom)); }
 #jamProg button.sel, #jamStyle button.sel { background: var(--accent); color: var(--accent-ink); }
 .jam-page .page-head { display: none; }
 #jamArea { grid-template-columns: minmax(0, 1fr); } #jamArea .panel { min-width: 0; }
+
+/* ── v2.10.0: 마이크·입력 표시·오디오 멈춤 안내 ── */
+.mic-chip.sel { background: var(--accent); color: var(--accent-ink); }
+.mic-chip.sel svg { stroke: var(--accent-ink); }
+.eval-box { background: var(--panel); border-radius: 14px; padding: 10px 12px; display: grid; gap: 6px; }
+.eb-top { display: flex; align-items: center; gap: 10px; }
+.eb-meter { flex: 1; height: 10px; background: #0b1222; border-radius: 6px; overflow: hidden; }
+.eb-meter i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #4fc3a1, #b6f36c 70%, #ffb86b); transition: width .08s linear; }
+.eb-heard { font-size: 14px; color: var(--muted); white-space: nowrap; }
+.eb-heard b { font-size: 18px; color: var(--text, #f1f4fa); display: inline-block; min-width: 2.6em; }
+.eb-msg { font-size: 16px; font-weight: 600; line-height: 1.4; min-height: 2.8em; }
+.eb-msg.ok { color: #4fc3a1; }
+.eb-msg.bad { color: #ff8a65; }
+.audio-banner { position: sticky; top: calc(var(--topbar-h) + var(--safe-top, 0px)); z-index: 19; display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 8px 12px 0; padding: 10px 12px; border-radius: 14px; background: #4a2424; color: #ffd9cf; font-size: 14px; }
+.audio-banner.hidden { display: none; }
+
+/* ── v2.10.0: 릭 메뉴·릭 1개 연습 ── */
+.sub-h { margin: 22px 4px 10px; font-size: 15px; font-weight: 700; color: var(--muted); }
+.sub-h small { font-weight: 400; margin-left: 6px; }
+.lk-pick .txt b { display: block; }
+.lk-pick-t { font-weight: 400; color: var(--muted); font-size: 13px; margin-left: 4px; }
+.lk-pick .tag { letter-spacing: 1px; }
+.seg.wrap-seg { flex-wrap: wrap; border-radius: 16px; }
+.seg small { opacity: .7; font-size: 11px; margin-left: 2px; }
+.lk-empty { text-align: center; padding: 22px 14px; }
+.lk-old summary { cursor: pointer; font-weight: 600; }
+.lk-all-filter select, .lk-all-filter input { width: 100%; min-height: 42px; border-radius: 12px; border: 0; background: var(--panel2); color: inherit; padding: 0 12px; font-size: 15px; }
+.lk1-pick { display: grid; gap: 4px; padding: 12px; background: var(--panel2); border-radius: 14px; }
+.lk1-pick span { font-size: 14px; }
+.lk1-title { display: grid; gap: 2px; margin: 2px 0 8px; }
+.lk1-title small { font-size: 13px; }
+.lk1-now { font-size: 16px; padding: 10px 12px; background: var(--panel); border-radius: 12px; margin-top: 8px; min-height: 1.4em; }
+.lk1-now b { color: var(--accent); margin-right: 6px; }
+/* 아래 고정 조작부는 양옆으로 화면 끝까지(최대 너비 제한에서 빼야 왼쪽으로 쏠리지 않음) */
+.sess .nf .ctl-dock { max-width: none !important; }

@@ -270,7 +270,7 @@ export function makePatternTask(kind) {
       st = { ...st, bpm: clampBpm(st.bpm + Number(b.dataset.bpm)) };
       setSetting(`${P}.bpm`, st.bpm); setRhythmBpm(st.bpm); $("#rhBpm").textContent = st.bpm; persist();
     });
-    const watch = setInterval(() => { if (playing && !running()) stop(); }, 300);
+    const watch = setInterval(() => { if (playing && (!running() || !isRhythmRunning())) stop(); }, 300);
     load(); drawAll(); persist();
     return () => { clearInterval(watch); stopRhythm(); };
   }

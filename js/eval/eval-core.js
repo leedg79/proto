@@ -1,6 +1,7 @@
 // 연주 평가 판정·기록 (순수 함수)
 // 대상(target) 종류
 //  note   : { kind:"note", label, midis:[허용 MIDI] | pcs:[음 이름 번호] }   → 맞는 음이 처음 잡힌 시각까지 = 수행시간
+//  count  : { kind:"count", label, pcs, need }                         → 맞는 음 이름을 need번 침, 첫 어택~마지막 맞은 어택 = 수행시간, 정확도 = 맞은 음 ÷ 친 음
 //  chord  : { kind:"chord", label, pcs, root }                          → 구성음이 잠깐(3프레임) 유지되면 성공
 //  set    : { kind:"set", label, pcs, root }                            → 스케일 안의 음 비율 × 구성음 커버
 //  seq    : { kind:"seq", label, midis:[순서], octaveFree }              → 순서대로 맞힌 음, 틀린 위치 기록
@@ -14,7 +15,7 @@ export const noteName = midi => NAMES[mod(midi)] + (Math.floor(midi / 12) - 1);
 export const pcName = pc => NAMES[mod(pc)];
 
 export function startAttempt(target, t0) {
-  return { target, t0, firstT: null, lastT: null, doneT: null, ok: false, notes: [], wrong: [], idx: 0, chordRun: 0, covered: [], expected: [], onsets: [], finished: false };
+  return { target, t0, firstT: null, lastT: null, doneT: null, ok: false, notes: [], wrong: [], idx: 0, hits: 0, chordRun: 0, covered: [], expected: [], onsets: [], finished: false };
 }
 
 // 음 하나가 잡혔을 때 → { a, event: "ok"|"wrong"|"progress"|null }
@@ -26,6 +27,13 @@ export function feedNote(a, midi, t) {
     const hit = T.midis ? T.midis.includes(midi) : T.pcs.map(mod).includes(mod(midi));
     if (hit) return { a: { ...n, ok: true, doneT: t, finished: true }, event: "ok" };
     return { a: { ...n, wrong: [...n.wrong, noteName(midi)] }, event: "wrong" };
+  }
+  if (T.kind === "count") {
+    const hit = T.pcs.map(mod).includes(mod(midi));
+    if (!hit) return { a: { ...n, wrong: [...n.wrong, noteName(midi)] }, event: "wrong" };
+    const hits = (a.hits || 0) + 1;
+    const fin = hits >= (T.need || 1);
+    return { a: { ...n, hits, doneT: t, ok: fin, finished: fin }, event: fin ? "ok" : "progress" };
   }
   if (T.kind === "set") {
     const inSet = T.pcs.map(mod).includes(mod(midi));
@@ -98,6 +106,13 @@ export function finishAttempt(a, t, { minNotes = 0 } = {}) {
   if (T.kind === "note" || T.kind === "chord") {
     const tries = a.wrong.length + (a.ok ? 1 : 0);
     return { ...base, ok: a.ok, score: a.ok ? 1 / Math.max(1, tries) : 0, timeMs: a.ok ? timeMs(a.doneT) : null, mistakes: a.ok ? a.wrong : [...a.wrong, `${T.label} 못 찾음`] };
+  }
+  if (T.kind === "count") {
+    const need = T.need || 1, hits = a.hits || 0, tries = hits + a.wrong.length;
+    const acc = tries ? hits / tries : 0;
+    const score = Math.min(1, hits / need) * acc;
+    const miss = hits < need ? [`${need - hits}음 못 침`] : [];
+    return { ...base, ok: hits >= need, score, timeMs: hits >= need && a.firstT != null ? Math.max(0, Math.round((a.doneT - a.firstT) * 1000)) : null, mistakes: [...a.wrong, ...miss], hits, total: need };
   }
   if (T.kind === "set") {
     const total = a.notes.length;
