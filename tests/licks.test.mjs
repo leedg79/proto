@@ -107,3 +107,20 @@ test("장르 릭 자리: 장르 8개·기타리스트, 줄 형식으로 넣으�
   L.setGenreRows([]);
   assert.equal(L.lickById("T-02"), null);
 });
+
+test("SRV 릭 16개: 형식·검사 통과, 마디 정렬, 난이도 3단계, 새 기법 해석", async () => {
+  const L = await import("../js/modules/licks/lick-core.js");
+  const { GENRE_LICK_ROWS } = await import("../js/modules/licks/genre-data.js");
+  L.setGenreRows(GENRE_LICK_ROWS);
+  const srv = L.genreLicks({ genre: "blues", player: "srv" });
+  assert.equal(srv.length, 16);
+  assert.equal(new Set(srv.map(l => l.id)).size, 16);
+  for (const l of srv) { assert.deepEqual(L.validate(l), [], l.id); assert.ok(l.bars >= 1 && l.bars <= 5, l.id); }
+  assert.deepEqual([1, 2, 3].map(d => L.genreLicks({ genre: "blues", player: "srv", diff: d }).length), [4, 7, 5]);
+  const t = L.parseToken("2-3+3-4:q~g-1");
+  assert.equal(t.grace, -1); assert.equal(t.vib, true); assert.equal(t.notes.length, 2);
+  assert.equal(L.parseToken("1-15:ebq").bend, 0.5);
+  assert.equal(L.parseToken("4-1+3-2:t+h~c").dur, 28);
+  const k = L.parseToken("1-14:ek-2"); assert.equal(k.grace, -2); assert.equal(k.graceHP, true);
+  assert.equal(L.parseToken("1-2:x").dur, 2); assert.equal(L.parseToken("1-2:u").dur, 8);
+});

@@ -39,6 +39,7 @@ export async function playLick(lick, bpm = 80, { onEvent, countIn = 0, click = f
         if (e.bend) opts.bend = e.bend;
         if (e.rel && prev && prev.bend) opts.release = prev.bend;
         if (e.sl && prev && !prev.rest) opts.slideFrom = TUNING[prev.notes[0].s - 1] + prev.notes[0].f;
+        else if (e.grace && (!e.graceHP || n === e.notes[0])) { opts.slideFrom = midi + e.grace; if (e.graceHP) opts.slideTime = 0.03; }   // 꾸밈음: 슬라이드는 모든 음, 해머·풀은 첫 음만(빠르게)
         const s = playNote("guitar", midi, t, dur, opts);
         if (s) srcs.push(s);
       }

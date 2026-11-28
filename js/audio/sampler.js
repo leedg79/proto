@@ -63,7 +63,7 @@ export function playNote(inst, midi, when, dur, opts = {}) {
   const vol = (opts.gain ?? 0.8) * (opts.soft ? 0.55 : 1);
   let pitch = base;
   if (opts.release) { pitch = base * rate(opts.release); p.setValueAtTime(pitch, when); p.linearRampToValueAtTime(base, when + Math.min(0.18, dur * 0.6)); pitch = base; }
-  else if (opts.slideFrom != null) { p.setValueAtTime(rate(opts.slideFrom - s), when); p.linearRampToValueAtTime(base, when + Math.min(0.09, dur * 0.5)); }
+  else if (opts.slideFrom != null) { p.setValueAtTime(rate(opts.slideFrom - s), when); p.linearRampToValueAtTime(base, when + (opts.slideTime ?? Math.min(0.09, dur * 0.5))); }
   else p.setValueAtTime(base, when);
   let vibStart = when + Math.min(0.2, dur * 0.35);
   if (opts.bend) {

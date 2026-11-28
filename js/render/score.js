@@ -64,7 +64,13 @@ function splitBars(events, ticks) {
 }
 
 // opts: chords, ticks, flats, active(이벤트 번호), width
+// 오선으로 나타낼 수 있는 길이인지(셋잇단 4·2틱, 또는 일반 음표 조각으로 정확히 나뉨)
+function drawable(events) {
+  return events.every(e => e.dur === 4 || e.dur === 2 || pieces(e.dur).reduce((a, [t]) => a + t, 0) === e.dur);
+}
 export function scoreSvg(el, events, { chords = [], ticks = BAR, flats = false, active = -1, width = 520, tab = true, staff = true, perRow = 1 } = {}) {
+  // 12/8 근사 길이(1·8틱)나 이어지는 긴 음은 오선 대신 TAB 그림으로(호출한 쪽이 tabSvg로 그림)
+  if (!drawable(events)) return false;
   const V = VF();
   if (!V) return false;
   el.innerHTML = "";
@@ -102,7 +108,7 @@ export function scoreSvg(el, events, { chords = [], ticks = BAR, flats = false, 
     for (const x2 of list) {
       const e = x2.e;
       const isRest = e.rest || !e.notes || !e.notes.length;
-      const code = x2.trip ? "8" : x2.code;
+      const code = x2.trip ? (x2.dur === 2 ? "16" : "8") : x2.code;
       let sn = null, tn = null;
       if (staff) {
         if (isRest) sn = new V.StaveNote({ keys: ["b/4"], duration: code + "r" });
@@ -120,7 +126,8 @@ export function scoreSvg(el, events, { chords = [], ticks = BAR, flats = false, 
         if (isRest || x2.cont) tn = new V.GhostNote({ duration: code });
         else {
           tn = new V.TabNote({ positions: e.notes.map(n => ({ str: n.s, fret: n.f })), duration: code });
-          if (e.bend) tn.addModifier(new V.Bend(e.bend === 1 ? "1/2" : e.bend === 2 ? "Full" : "1 1/2"), 0);
+          if (e.bend) tn.addModifier(new V.Bend(e.bend === 0.5 ? "1/4" : e.bend === 1 ? "1/2" : e.bend === 2 ? "Full" : "1 1/2"), 0);
+          if (e.grace) tn.addModifier(new V.Annotation(`${e.notes[0].f + e.grace}${e.graceHP ? (e.grace < 0 ? "h" : "p") : e.grace < 0 ? "↗" : "↘"}`).setFont("Arial", 11).setVerticalJustification(V.Annotation.VerticalJustify.BOTTOM), 0);
           if (e.rel) tn.addModifier(new V.Annotation("R").setVerticalJustification(V.Annotation.VerticalJustify.TOP), 0);
           if (e.vib) tn.addModifier(new V.Vibrato(), 0);
           if (x2.idx === active && active >= 0) tn.setStyle({ fillStyle: "#e0a800", strokeStyle: "#e0a800" });

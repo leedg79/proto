@@ -42,7 +42,7 @@ import * as Ev from "./eval/evaluator.js";
 import { micLevel, isMicOpen } from "./audio/mic.js";
 import { summary as evalSummary, summaryText as evalText } from "./eval/eval-core.js";
 
-const APP_VERSION = "2.10.0";
+const APP_VERSION = "2.10.1";
 
 // 구현된 과제의 연습 화면 (모듈/과제 → 화면 모듈)
 // 화면 모듈: settingsHtml, bindSettings, readSettings, mount, clearFinder

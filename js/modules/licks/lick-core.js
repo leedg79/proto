@@ -8,7 +8,9 @@ import { LICK_LEVELS } from "../../data/catalog.js";
 
 const mod = n => ((n % 12) + 12) % 12;
 const BEAT = 12, BAR = 48;
-const DUR = { w: 48, h: 24, "q.": 18, q: 12, "e.": 9, e: 6, s: 3, t: 4 };
+// x = 16분 셋잇단(2틱), y = 1틱(12/8의 16분 셋잇단 근사용), u = 4분 셋잇단·12/8의 4분음표(8틱). "t+h"처럼 더하면 이어지는 긴 음
+const DUR = { w: 48, h: 24, "q.": 18, q: 12, "e.": 9, e: 6, s: 3, t: 4, x: 2, y: 1, u: 8 };
+const DUR_RE = "(?:w|h|q\\.|q|e\\.|e|s|t|x|y|u)";
 
 // 릭 전용 스케일(검사·도수 표기용)
 export const EXTRA_SCALES = {
@@ -23,17 +25,22 @@ export const scaleNameOf = id => (EXTRA_SCALES[id] || SCALES[id]).name;
 const SUB_LEVEL = Object.fromEntries(LICK_LEVELS.flatMap(l => l.subs.map(([id]) => [id, l.id])));
 export const USE_NAMES = { f: "필인", i: "인트로", c: "클라이맥스", t: "턴어라운드", e: "엔딩", l: "라인", r: "리프", a: "아르페지오" };
 export const FEEL_NAMES = { straight: "스트레이트", shuffle: "셔플", triplet: "셋잇단" };
-export const TECH_NAMES = { b: "벤딩", r: "릴리스", h: "해머온", p: "풀오프", sl: "슬라이드", "~": "비브라토", ds: "더블스톱", c: "경과음" };
+export const TECH_NAMES = { b: "벤딩", r: "릴리스", h: "해머온", p: "풀오프", sl: "슬라이드", "~": "비브라토", ds: "더블스톱", c: "경과음", g: "꾸밈음 슬라이드" };
 
 // "2-8+1-8:eb2~" → { notes:[{s,f}], dur, bend, rel, h, p, sl, vib, chrom, rest }
 export function parseToken(tok) {
   const [pos, spec] = tok.split(":");
-  const m = /^(w|h|q\.|q|e\.|e|s|t)(.*)$/.exec(spec || "");
+  const m = new RegExp(`^(${DUR_RE}(?:\\+${DUR_RE})*)(.*)$`).exec(spec || "");
   if (!m) throw new Error(`길이 해석 불가: ${tok}`);
-  const dur = DUR[m[1]];
+  const dur = m[1].split("+").reduce((a, k) => a + DUR[k], 0);
   let rest = m[2];
-  const ev = { dur, bend: 0, rel: false, h: false, p: false, sl: false, vib: false, chrom: false, rest: pos === "-" };
+  const ev = { dur, bend: 0, rel: false, h: false, p: false, sl: false, vib: false, chrom: false, grace: 0, rest: pos === "-" };
   const take = re => { const x = re.exec(rest); if (x) rest = rest.replace(re, ""); return x; };
+  // 꾸밈음 슬라이드: g-1 = 한 프렛 아래에서 미끄러져 들어감, g2 = 두 프렛 위에서
+  const g = take(/g(-?\d+)/); if (g) ev.grace = Number(g[1]);
+  // 꾸밈음 해머·풀: k-2 = 두 프렛 아래 꾸밈음에서 해머, k2 = 두 프렛 위 꾸밈음에서 풀(첫 음에만)
+  const k = take(/k(-?\d+)/); if (k) { ev.grace = Number(k[1]); ev.graceHP = true; }
+  if (take(/bq/)) ev.bend = 0.5;          // ¼ 벤딩
   const b = take(/b([123])/); if (b) ev.bend = Number(b[1]);
   if (take(/sl/)) ev.sl = true;
   if (take(/r/)) ev.rel = true;
@@ -121,7 +128,7 @@ export const lickDifficulty = l => (l.diff != null ? l.diff : difficultyOf(l));
 // 해머·풀·슬라이드·릴리스는 같은 줄에서 방향이 맞아야 함
 export function validate(l) {
   const errs = [];
-  const maxBars = l.custom || l.genreLick ? 4 : 2;
+  const maxBars = l.genreLick ? 8 : l.custom ? 4 : 2;
   const maxFret = l.genreLick ? 24 : 17;
   if (l.ticks > maxBars * BAR) errs.push(`길이 ${l.ticks / BAR}마디 > ${maxBars}마디`);
   let prev = null;
@@ -136,7 +143,7 @@ export function validate(l) {
       if (n.s < 1 || n.s > 6 || n.f < 0 || n.f > maxFret) errs.push(`${n.s}-${n.f} 범위 밖`);
       const pc = mod(midiOf(n.s, n.f));
       if (!e.chrom && !e.rel && !allowed.has(pc)) errs.push(`${n.s}-${n.f} 스케일 밖`);
-      if (e.bend && !allowed.has(mod(pc + e.bend))) errs.push(`${n.s}-${n.f} 벤딩 목표음 스케일 밖`);
+      if (e.bend >= 1 && !e.chrom && !allowed.has(mod(pc + e.bend))) errs.push(`${n.s}-${n.f} 벤딩 목표음 스케일 밖`);
     }
     const n = e.notes[0];
     if ((e.h || e.p || e.sl || e.rel) && (!prev || prev.notes[0].s !== n.s)) errs.push(`${n.s}-${n.f} 같은 줄 연결 아님`);
@@ -170,7 +177,7 @@ export function realize(l, toKey = l.key) {
     const midi = midiOf(n.s, n.f);
     const ch = chordAt(chords, e.at);
     const lab = m => ({ deg: DEG_GENERIC[mod(m - toKey)], cdeg: ch ? degreeLabel(m - ch.root, ch) : null });
-    const a = lab(midi), b = e.bend ? lab(midi + e.bend) : null;
+    const a = lab(midi), b = e.bend >= 1 ? lab(midi + e.bend) : null;
     notes.push({ ...n, at: e.at, midi, deg: a.deg, cdeg: a.cdeg, bendDeg: b ? (b.cdeg || b.deg) : null, chord: ch ? ch.name : null });
   }
   // 블록: 기준 스케일(진행 릭은 키 스케일) 블록 중 릭 음을 가장 많이 포함하는 것
@@ -197,7 +204,7 @@ export function realize(l, toKey = l.key) {
   const techs = new Set();
   for (const e of events) {
     if (e.bend) techs.add("b"); if (e.rel) techs.add("r"); if (e.h) techs.add("h"); if (e.p) techs.add("p");
-    if (e.sl) techs.add("sl"); if (e.vib) techs.add("~"); if (e.notes.length > 1) techs.add("ds"); if (e.chrom) techs.add("c");
+    if (e.sl) techs.add("sl"); if (e.grace) techs.add("g"); if (e.vib) techs.add("~"); if (e.notes.length > 1) techs.add("ds"); if (e.chrom) techs.add("c");
   }
   return {
     ...l, key: toKey, delta: d, events, chords, notes, techs: [...techs],
