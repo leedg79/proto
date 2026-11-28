@@ -139,12 +139,15 @@ test("시작음: 고른 구간 안에서 시작", () => {
 test("Block Transition: 블록 1에서 시작, 중간 줄 슬라이드로 블록 2로 넘어가 최고음까지", () => {
   const c = BC.transitionCycle(9, "minor-penta", 2, "up", 1, [0, 0, 0, 0]);
   assert.deepEqual(c.runs.map(r => r.label), ["5→1", "1→2", "2→3", "3→4"]);
-  const r = c.runs[1]; // A 마이너 펜타 1→2, 4번 줄에서 전환
-  assert.deepEqual(r.notes.map(n => `${n.s}-${n.f}`), ["6-5", "6-8", "5-5", "5-7", "4-5", "4-7", "4-10", "3-7", "3-9", "2-8", "2-10", "1-8", "1-10"]);
-  assert.deepEqual(r.slides, [6]);
-  // 다른 줄 조합을 고르면 다른 경로
+  const r = c.runs[1]; // A 마이너 펜타 1→2: v2.11.0부터 온음(2프렛) 슬라이드만 → 4번 줄(3프렛)이 아니라 3번 줄 7→9에서 전환
+  assert.deepEqual(r.notes.map(n => `${n.s}-${n.f}`), ["6-5", "6-8", "5-5", "5-7", "4-5", "4-7", "3-5", "3-7", "3-9", "2-8", "2-10", "1-8", "1-10"]);
+  assert.deepEqual(r.slides, [8]);
+  assert.equal(r.notes[8].f - r.notes[7].f, 2);
   const r3 = BC.transitionCycle(9, "minor-penta", 2, "up", 1, [1, 1, 1, 1]).runs[1];
   assert.equal(r3.notes[r3.slides[0]].s, 3);
+  // 펜타토닉은 모든 키·경로에서 슬라이드가 2프렛뿐
+  for (let pc = 0; pc < 12; pc++) for (const p of [0, 1, 2, 3]) for (const x of BC.transitionCycle(pc, "minor-penta", 2, "up", 1, [p, p, p, p]).runs)
+    for (const i of x.slides) assert.equal(Math.abs(x.notes[i].f - x.notes[i - 1].f), 2);
   // 하행은 높은 블록 최고음 → 낮은 블록 최저음
   const d = BC.transitionCycle(9, "minor-penta", 2, "down", 1, [0, 0, 0, 0]).runs[1];
   assert.equal(`${d.notes[0].s}-${d.notes[0].f}`, "1-10"); assert.equal(`${d.notes.at(-1).s}-${d.notes.at(-1).f}`, "6-5");

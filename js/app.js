@@ -37,12 +37,12 @@ import { makeEarTask } from "./modules/ear/ear-view.js";
 import * as RhythmReading from "./modules/rhythm/reading-view.js";
 import * as RhythmPhrase from "./modules/rhythm/phrase-view.js";
 import { strum, loadInstrument } from "./audio/sampler.js";
-import { unlockAudio, audioHealth, resetAudio } from "./audio/context.js";
+import { unlockAudio, audioHealth, resetAudio, releaseAudio } from "./audio/context.js";
 import * as Ev from "./eval/evaluator.js";
 import { micLevel, isMicOpen } from "./audio/mic.js";
 import { summary as evalSummary, summaryText as evalText } from "./eval/eval-core.js";
 
-const APP_VERSION = "2.10.1";
+const APP_VERSION = "2.11.0";
 
 // 구현된 과제의 연습 화면 (모듈/과제 → 화면 모듈)
 // 화면 모듈: settingsHtml, bindSettings, readSettings, mount, clearFinder
@@ -260,6 +260,7 @@ function renderJamPage() {
     
     <div id="jamArea" style="display:grid;gap:14px"></div>`;
   onCleanup(renderJam($("#jamArea"), { toast }));
+  onCleanup(() => releaseAudio());
   return "백킹 트랙";
 }
 
@@ -665,10 +666,11 @@ function renderSession() {
         <button class="btn primary wide" id="liveApply" type="button" style="margin-top:16px">적용하고 계속</button>
         <p class="muted small" style="margin:6px 0 0">적용하면 연습 화면이 새 설정으로 다시 시작됨. 연습시간과 완료 횟수는 이어짐 · 완료 기준: ${esc(unitLabel)}</p>
       </div>` : "";
+  // v2.11.0: 동그라미 시작 화면 대신, 연습 화면을 먼저 보여 주고 아래 고정 "시작" 버튼 하나로 시작(모든 과제 공통)
   const gate = `
-      <div class="practice-gate span-all" id="gate">
-        <button class="gate-btn" id="practiceStart" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l12-7.5z"/></svg><span>연습 시작</span></button>
-        <p>누르면 시간이 재지고 반주가 함께 시작됨<br>화면을 나가면 자동 종료 · 완료 1회 이상만 기록</p>
+      <div class="start-dock" id="gate">
+        <button class="btn primary wide" id="practiceStart" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l12-7.5z"/></svg><span>시작</span></button>
+        <p>화면을 보고 준비가 되면 시작 · 시간이 재지고 반주형은 준비 클릭 뒤 연주</p>
       </div>`;
   view.innerHTML = content ? `
     <div class="sess content-layout">
@@ -688,8 +690,8 @@ function renderSession() {
         <div class="eb-top"><span class="eb-meter" aria-hidden="true"><i id="ebMeter"></i></span><span class="eb-heard">들린 음 <b id="ebHeard">-</b></span></div>
         <div class="eb-msg" id="evalLast">마이크 켜짐 · 문제가 나오면 판정 시작</div>
       </div>` : ""}
-      ${gate}
       <div class="content-panel" id="contentArea"></div>
+      ${gate}
     </div>
     <div class="ssheet hidden" id="sessSheet" role="dialog" aria-label="세션 설정">
       <div class="sheet-bg" data-close></div>
@@ -759,6 +761,8 @@ function renderSession() {
   const mic = { want: evalable && micWanted(s0) };
   if (evalable) bindEvalPanel(mic);
   onCleanup(() => { if (Ev.isOn()) Ev.disable(); Ev.end(); });
+  // 세션을 벗어나면(종료·자동 종료·화면 이탈) 재생기·마이크·오디오 장치를 모두 정리 → 아이폰 백그라운드 오디오 표시가 남지 않게
+  onCleanup(() => { document.body.classList.remove("sess-ready"); releaseAudio(); });
   // 마이크 기본 켬: "연습 시작"(터치) 때 켬. 이미 진행 중인 세션 화면에 다시 들어오면 바로 켬
   const micAtStart = async () => { if (evalable && mic.want && !Ev.isOn()) { await micOn(); if (mic.draw) mic.draw(); } };
   if (S.getActive().status !== "ready") micAtStart();
@@ -814,7 +818,7 @@ function renderSession() {
     if ($("#stateDot")) $("#stateDot").className = "sc-dot " + (ready ? "" : running ? "running" : "paused");
     $("#pauseBtn").classList.toggle("hidden", ready);
     $("#gate").classList.toggle("hidden", !ready);
-    if ($("#contentArea")) $("#contentArea").classList.toggle("hidden", ready);
+    document.body.classList.toggle("sess-ready", ready && !!$("#contentArea"));
     $("#unitCount").textContent = s.completedUnits;
     if ($("#evalSum")) $("#evalSum").textContent = Ev.isOn() || s.eval ? evalText(evalSummary(s.eval)) : "";
     if (!hasMetro) return;

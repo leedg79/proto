@@ -25,8 +25,9 @@ function rowHtml(l) {
     </button>`;
 }
 // 릭 고르기 → 세션 전 설정 화면(m/licks/<레벨>/lick-one). 뒤로 가면 고른 목록으로
-export function pickLick(l, go, from) {
+export function pickLick(l, go, from, ids = null) {
   setSetting("lk1.pick", l.id);
+  if (ids) setSetting("lk1.list", ids);   // 세션에서 이전·다음 릭으로 넘길 목록(지금 보던 순서)
   setSetting("lk.from", from);
   go(`m/licks/${l.genreLick ? l.level : "basic"}/lick-one`);
 }
@@ -34,7 +35,8 @@ export function pickLick(l, go, from) {
 function handlePick(e, go, from) {
   const b = e.target.closest("[data-pick]"); if (!b) return false;
   const l = allLicks().find(x => x.id === b.dataset.pick);
-  if (l) pickLick(l, go, from);
+  const ids = [...e.currentTarget.querySelectorAll("[data-pick]")].map(x => x.dataset.pick);
+  if (l) pickLick(l, go, from, ids);
   return true;
 }
 

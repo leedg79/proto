@@ -5,7 +5,7 @@
 //  GENRES의 players에 { id, name, short } 를 넣음(id는 영문 소문자·숫자·하이픈, 한 장르 안에서 겹치지 않게)
 //
 // ── 릭 한 줄 형식 ──
-//  [번호, 장르 id, 기타리스트 id, 난이도(1 초급 · 2 중급 · 3 고급), 스케일, 기준 키(pc), 용도, 리듬 느낌, 음 목록, 코드(선택), 이름(선택), 메모(선택)]
+//  [번호, 장르 id, 기타리스트 id, 난이도(참고용 · v2.11.0부터 앱이 절대 기준으로 자동 계산), 스케일, 기준 키(pc), 용도, 리듬 느낌, 음 목록, 코드(선택), 이름(선택), 메모(선택)]
 //  번호   : 장르·기타리스트 약자 + 일련번호 예) "SRV-01"  (전체 릭에서 겹치면 안 됨)
 //  스케일 : minor-penta, major-penta, blues, mixed-blues, major, natural-minor, harmonic-minor, dorian, mixolydian, lydian, phrygian, altered 등
 //  기준 키: 0=C 1=C# 2=D 3=Eb 4=E 5=F 6=F# 7=G 8=Ab 9=A 10=Bb 11=B
@@ -20,16 +20,16 @@ export const GENRES = [
   { id: "blues", name: "블루스", players: [
     { id: "srv", name: "Stevie Ray Vaughan", short: "SRV" },
     { id: "bbking", name: "B.B. King", short: "B.B. King" },
-    { id: "albertking", name: "Albert King", short: "Albert King" },
     { id: "freddieking", name: "Freddie King", short: "Freddie King" },
-    { id: "clapton", name: "Eric Clapton", short: "Clapton" }
+    { id: "clapton", name: "Eric Clapton", short: "Clapton" },
+    { id: "mayer", name: "John Mayer", short: "John Mayer" }
   ] },
   { id: "neosoul", name: "네오소울", players: [
+    { id: "soejima", name: "Toshiki Soejima", short: "Soejima" },
     { id: "sharkey", name: "Isaiah Sharkey", short: "Sharkey" },
     { id: "asato", name: "Mateus Asato", short: "Asato" },
     { id: "misch", name: "Tom Misch", short: "Tom Misch" },
-    { id: "faye", name: "Melanie Faye", short: "Melanie Faye" },
-    { id: "mayer", name: "John Mayer", short: "John Mayer" }
+    { id: "faye", name: "Melanie Faye", short: "Melanie Faye" }
   ] },
   { id: "rnb", name: "R&B", players: [
     { id: "mayfield", name: "Curtis Mayfield", short: "Mayfield" },

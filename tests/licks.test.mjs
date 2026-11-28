@@ -98,9 +98,9 @@ test("장르 릭 자리: 장르 8개·기타리스트, 줄 형식으로 넣으�
     ["T-02", "blues", "srv", 3, "minor-penta", 4, "l", "straight", "1-19:s 1-17:s 2-20:s 2-17:s 3-19:s 3-16:s 4-19:s 4-17:s -:h -:w -:w -:w"]
   ]);
   assert.equal(L.genreLicks({ genre: "blues", player: "srv" }).length, 2);
-  assert.equal(L.genreLicks({ genre: "blues", player: "srv", diff: 3 }).length, 1);
+  assert.equal(L.genreLicks({ genre: "blues", player: "srv", diff: 2 }).length, 1);   // 줄의 난이도 값이 아니라 자동 계산(T-02: 4마디 2 + 16분 2 = 4점 → 중급)
   const t2 = L.lickById("T-02");
-  assert.equal(t2.level, "g-blues"); assert.equal(t2.bars, 4); assert.equal(L.realize(t2).difficulty, 3);
+  assert.equal(t2.level, "g-blues"); assert.equal(t2.bars, 4); assert.equal(L.realize(t2).difficulty, 2);
   assert.deepEqual(L.validate(t2), []);
   assert.equal(L.playerOf(t2).name, "Stevie Ray Vaughan");
   assert.equal(L.allLicks().length, L.LICKS.length + 2);
@@ -116,7 +116,11 @@ test("SRV 릭 16개: 형식·검사 통과, 마디 정렬, 난이도 3단계, �
   assert.equal(srv.length, 16);
   assert.equal(new Set(srv.map(l => l.id)).size, 16);
   for (const l of srv) { assert.deepEqual(L.validate(l), [], l.id); assert.ok(l.bars >= 1 && l.bars <= 5, l.id); }
-  assert.deepEqual([1, 2, 3].map(d => L.genreLicks({ genre: "blues", player: "srv", diff: d }).length), [4, 7, 5]);
+  // 난이도는 절대 기준 자동 계산(v2.11.0): 초급 3 · 중급 6 · 고급 7
+  assert.deepEqual([1, 2, 3].map(d => L.genreLicks({ genre: "blues", player: "srv", diff: d }).length), [3, 6, 7]);
+  const p = L.difficultyParts(L.lickById("SRV-04"));
+  assert.deepEqual([p.length, p.count, p.rhythm, p.outside, p.tech, p.total, p.level], [2, 2, 2, 2, 2, 10, 3]);
+  assert.equal(L.difficultyParts(L.lickById("SRV-16")).level, 1);
   const t = L.parseToken("2-3+3-4:q~g-1");
   assert.equal(t.grace, -1); assert.equal(t.vib, true); assert.equal(t.notes.length, 2);
   assert.equal(L.parseToken("1-15:ebq").bend, 0.5);

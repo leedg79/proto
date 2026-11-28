@@ -1,7 +1,7 @@
 // 메트로놈: 박자 스케줄러 + 합성 클릭음
 // 화면 표시(박 표시등)는 실제 소리가 나는 시각에 맞춰 갱신함
 
-import { unlockAudio, getAudioContext, onAudioReset } from "./context.js";
+import { unlockAudio, getAudioContext, onAudioReset, onAudioRelease } from "./context.js";
 import { BeatScheduler } from "./scheduler.js";
 
 let sched = null;
@@ -62,6 +62,7 @@ export async function startMetronome({ bpm, beatsPerBar }) {
 }
 
 onAudioReset(() => { stopMetronome(); sched = null; master = null; });
+onAudioRelease(() => stopMetronome());
 export function stopMetronome() {
   if (sched) sched.stop();
   visualQueue = [];

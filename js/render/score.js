@@ -103,6 +103,8 @@ export function scoreSvg(el, events, { chords = [], ticks = BAR, flats = false, 
       tstave.setContext(ctx).draw();
       if (staff && first) new V.StaveConnector(stave, tstave).setType("singleLeft").setContext(ctx).draw();
     }
+    // 오선(높은음자리표·박자표)과 TAB(TAB 표시)의 기호 폭이 달라 음표가 어긋나지 않게 시작점을 맞춤
+    if (stave && tstave) { const sx = Math.max(stave.getNoteStartX(), tstave.getNoteStartX()); stave.setNoteStartX(sx); tstave.setNoteStartX(sx); }
     const sNotes = [], tNotes = [], tripS = [], tripT = [];
     let tripBufS = [], tripBufT = [];
     for (const x2 of list) {

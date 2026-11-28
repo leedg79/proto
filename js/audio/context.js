@@ -11,6 +11,8 @@ let everRan = false;      // 한 번이라도 소리가 돌았는지(멈춤 안�
 let lastFlow = 0;         // 시계가 흐르는 것을 마지막으로 본 때(performance.now)
 let lastCt = -1, monitor = null, resets = 0;
 const resetSubs = new Set();
+const releaseSubs = new Set();
+let released = false;     // 세션을 마쳐 일부러 쉬게 한 상태(멈춤 안내를 띄우지 않음)
 
 export const sleep = ms => new Promise(r => setTimeout(r, ms));
 // 약속(promise)에 시간 제한: 넘으면 오류(이름 Timeout)
@@ -35,6 +37,17 @@ export function getAudioContext() {
 }
 // 컨텍스트를 새로 만들 때 알림(옛 컨텍스트에 묶인 노드·재생기·마이크를 정리)
 export function onAudioReset(fn) { resetSubs.add(fn); return () => resetSubs.delete(fn); }
+// 세션을 마칠 때 정리(재생기 멈춤·마이크 닫기). 각 재생기·마이크가 등록함
+export function onAudioRelease(fn) { releaseSubs.add(fn); return () => releaseSubs.delete(fn); }
+export async function releaseAudio() {
+  for (const f of releaseSubs) { try { f(); } catch (_) {} }
+  released = true;
+  recordMode = false;
+  try { if (navigator.audioSession) navigator.audioSession.type = "auto"; } catch (_) {}
+  try { if (navigator.mediaSession) { navigator.mediaSession.metadata = null; navigator.mediaSession.playbackState = "none"; } } catch (_) {}
+  if (ctx && ctx.state === "running") { try { await withTimeout(ctx.suspend(), 1500, "오디오 쉬기"); } catch (_) {} }
+}
+export const isReleased = () => released;
 
 function watch() {
   if (monitor) return;
@@ -59,7 +72,7 @@ function create() {
 export function audioHealth() {
   if (!ctx) return { exists: false, state: "none", sampleRate: 0, flowing: false, stalled: false, everRan, resets };
   const flowing = ctx.state === "running" && performance.now() - lastFlow < 1200;
-  return { exists: true, state: ctx.state, sampleRate: ctx.sampleRate, flowing, stalled: everRan && !flowing, everRan, resets, time: ctx.currentTime };
+  return { exists: true, state: ctx.state, sampleRate: ctx.sampleRate, flowing, stalled: everRan && !flowing && !released, released, everRan, resets, time: ctx.currentTime };
 }
 
 // 시계가 흐르는지 직접 확인(ms 동안 기다림)
@@ -83,6 +96,7 @@ export async function resetAudio() {
 
 // 컨텍스트가 실제로 돌아가게 만듦: resume(시간 제한) → 시계 확인 → 안 흐르면 새로 만듦
 export async function ensureRunning() {
+  released = false;
   if (!ctx) create();
   if (!ctx) return null;
   if (ctx.state !== "running") { try { await withTimeout(ctx.resume(), 1500, "오디오 켜기"); } catch (_) {} }

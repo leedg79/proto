@@ -102,7 +102,10 @@ export function buildGenreLick(row) {
   const events = notesStr.split(" ").map(parseToken);
   let t = 0;
   for (const e of events) { e.at = t; t += e.dur; }
-  return { id, sub: player, level: `g-${genre}`, genre, player, diff: Math.max(1, Math.min(3, Number(diff) || 1)), scale, key, use, feel, events, chords: parseChords(chordStr), ticks: t, bars: Math.ceil(t / BAR), name: name || "", note: note || "", custom: false, genreLick: true };
+  void diff;   // 줄에 적힌 난이도는 쓰지 않고 절대 기준으로 자동 계산(v2.11.0)
+  const l = { id, sub: player, level: `g-${genre}`, genre, player, diff: 1, scale, key, use, feel, events, chords: parseChords(chordStr), ticks: t, bars: Math.ceil(t / BAR), name: name || "", note: note || "", custom: false, genreLick: true };
+  l.diff = difficultyOf(l);
+  return l;
 }
 export const GENRE_LICKS = [];
 export function setGenreRows(rows) {
@@ -122,7 +125,7 @@ export function basicLicksSorted() {
 }
 export const allLicks = () => [...LICKS, ...GENRE_LICKS];
 export const lickById = id => LICKS.find(l => l.id === id) || GENRE_LICKS.find(l => l.id === id) || null;
-export const lickDifficulty = l => (l.diff != null ? l.diff : difficultyOf(l));
+export const lickDifficulty = l => difficultyOf(l);
 
 // 검사: 길이 2마디 이내, 음은 스케일(코드 구간은 코드 스케일) 안 또는 경과음 표시, 벤딩 목표음도 스케일 안,
 // 해머·풀·슬라이드·릴리스는 같은 줄에서 방향이 맞아야 함
@@ -214,7 +217,7 @@ export function realize(l, toKey = l.key) {
     shape, rootString, rootFret,
     land: last ? (last.bendDeg || last.cdeg || last.deg) : "-",
     lo: Math.min(...fr), hi: Math.max(...fr),
-    difficulty: l.diff != null ? l.diff : difficultyOf(l)
+    difficulty: difficultyOf(l)
   };
 }
 
@@ -240,16 +243,32 @@ export function overText(r) {
   return o.map(x => (x.startsWith("→") ? `${x.replace("→ V7", "")}${keyName(r.key + 7, "major")}7 → ${kn}m` : kn + x)).join(", ");
 }
 
-// 난이도: 1 = 8분음표 이하·쉬운 벤딩, 2 = 셋잇단·경과음·1음반 벤딩, 3 = 16분음표·얼터드
-export function difficultyOf(l) {
-  let lv = 1;
-  for (const e of l.events) {
-    if (e.dur === 4 || e.chrom || e.bend === 3 || e.dur === 18) lv = Math.max(lv, 2);
-    if (e.dur === 3) lv = 3;
+// 난이도(v2.11.0 절대 기준): 다섯 항목을 0~2점으로 매겨 합계 0~3 초급(1) · 4~6 중급(2) · 7~10 고급(3)
+//  길이(1마디 0 · 2마디 1 · 3마디 이상 2), 음 개수(8개 이하 0 · 9~20 1 · 21 이상 2),
+//  박자(8분까지 0 · 8분 셋잇단 1 · 16분·16분 셋잇단 2), 펜타토닉 밖 음(없음 0 · 1~2개 1 · 3개 이상 2),
+//  테크닉 종류(벤딩·릴리스·해머·풀·슬라이드·꾸밈음·비브라토·더블스톱 중 0~1종 0 · 2~3종 1 · 4종 이상 2)
+function minorLike(id) { return ["minor-penta", "blues", "mixed-blues", "natural-minor", "harmonic-minor", "melodic-minor", "dorian", "phrygian", "aeolian", "locrian", "altered", "phrygian-dominant"].includes(id); }
+export function difficultyParts(l) {
+  const evs = l.events.filter(e => !e.rest);
+  const length = l.bars <= 1 ? 0 : l.bars === 2 ? 1 : 2;
+  const count = evs.length <= 8 ? 0 : evs.length <= 20 ? 1 : 2;
+  let rhythm = 0;
+  for (const e of evs) {
+    const m = ((e.at % 12) + 12) % 12;
+    if ([1, 2, 3].includes(e.dur) || ![0, 4, 6, 8].includes(m)) { rhythm = 2; break; }
+    if ((m === 4 || m === 8) && l.feel !== "shuffle") rhythm = Math.max(rhythm, 1);
   }
-  if (l.chords.some(c => c.scale === "altered")) lv = 3;
-  return lv;
+  const penta = (minorLike(l.scale) ? [0, 3, 5, 7, 10] : [0, 2, 4, 7, 9]).map(x => mod(l.key + x));
+  let outN = 0;
+  for (const e of evs) for (const n of e.notes) if (!penta.includes(mod(midiOf(n.s, n.f)))) outN++;
+  const outside = outN === 0 ? 0 : outN <= 2 ? 1 : 2;
+  const t = new Set();
+  for (const e of evs) { if (e.bend) t.add("b"); if (e.rel) t.add("r"); if (e.h) t.add("h"); if (e.p) t.add("p"); if (e.sl) t.add("sl"); if (e.grace) t.add("g"); if (e.vib) t.add("~"); if (e.notes.length > 1) t.add("ds"); }
+  const tech = t.size <= 1 ? 0 : t.size <= 3 ? 1 : 2;
+  const total = length + count + rhythm + outside + tech;
+  return { length, count, rhythm, outside, tech, total, level: total <= 3 ? 1 : total <= 6 ? 2 : 3 };
 }
+export function difficultyOf(l) { return difficultyParts(l).level; }
 
 export function licksFor(levelId, subs = null) {
   return LICKS.filter(l => l.level === levelId && (!subs || !subs.length || subs.includes(l.sub)));

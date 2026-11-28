@@ -1,6 +1,6 @@
 // 마이크 열기 + 어택 감지. 재생과 같은 오디오 시계(AudioContext.currentTime)로 시각을 잼
 // iPhone: 마이크를 쓰는 동안 오디오 세션을 "play-and-record"로 바꿔야 입력이 들어옴
-import { unlockAudio, getAudioContext, setRecordMode, audioSessionAuto, onAudioReset, withTimeout } from "./context.js";
+import { unlockAudio, getAudioContext, setRecordMode, audioSessionAuto, onAudioReset, onAudioRelease, withTimeout } from "./context.js";
 import { OnsetDetector, blockEnergy } from "./onset-core.js";
 
 let mic = null;
@@ -103,6 +103,7 @@ export const isMicOpen = () => !!mic;
 // 오디오 컨텍스트를 새로 만들면 옛 입력 연결은 못 씀 → 닫고, 평가기가 다시 엶
 onAudioReset(() => { if (mic) { const keepRec = recordModeOn(); closeMic(); if (keepRec) setRecordMode(true); } });
 const recordModeOn = () => !!mic;
+onAudioRelease(() => closeMic());
 export function closeMic() {
   if (!mic) return;
   try { if (mic.monitor) mic.monitor.disconnect(); mic.node.disconnect(); mic.src.disconnect(); } catch (_) {}

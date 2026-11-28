@@ -61,12 +61,28 @@ export function readSettings(root) {
 
 const pcOf = m => ((m % 12) + 12) % 12;
 
+// 세션 안에서 이전·다음 릭으로 바꿀 수 있게: 릭 하나를 그리는 mountOne을 바꿔 끼움(완료 횟수·BPM은 이어짐)
 export function mount(container, api) {
+  let cleanup = null;
+  const show = id => { if (cleanup) cleanup(); cleanup = mountOne(container, api, id, show); };
+  show(null);
+  return () => { if (cleanup) cleanup(); };
+}
+// 고른 목록(기본 릭 모음·장르·전체 목록에서 보던 순서)
+const pickList = () => { const l = getSetting("lk1.list", []); return Array.isArray(l) ? l.filter(id => lickById(id)) : []; };
+
+function mountOne(container, api, switchTo, show) {
   const s0 = api.getActive();
   const o = s0.options || {};
-  const lick = lickById(o.lickId) || LICKS[0];
   let st = store.load(s0.id);
-  if (!st || st.lickId !== lick.id) st = { lickId: lick.id, key: o.key === "random" ? KEY_LIST[Math.floor(Math.random() * 12)] : lick.key, cur: 0, part: "all", runs: 0, passes: 0, units: 0, bpm: getSetting("lk1.bpm", 60) };
+  const lick = lickById(switchTo || (st && st.lickId) || o.lickId) || LICKS[0];
+  const newKey = () => (o.key === "random" ? KEY_LIST[Math.floor(Math.random() * 12)] : lick.key);
+  if (!st) st = { lickId: lick.id, key: newKey(), cur: 0, part: "all", runs: 0, passes: 0, units: 0, bpm: getSetting("lk1.bpm", 60) };
+  else if (st.lickId !== lick.id) st = { ...st, lickId: lick.id, key: newKey(), cur: 0, part: "all", runs: 0, passes: 0 };
+  setSetting("lk1.pick", lick.id);
+  const nameEl = document.querySelector(".sess-name b"); if (nameEl) nameEl.textContent = `릭 ${lick.id}`;
+  const list = pickList();
+  const pos = list.indexOf(lick.id);
   const persist = () => store.save(s0.id, st);
   const r = realize(lick, st.key);
   const ev = api.eval;
@@ -79,7 +95,12 @@ export function mount(container, api) {
 
   container.innerHTML = `
     <div class="nf lk lk1">
-      <div class="nf-meta"><span id="l1No">${esc(lick.id)}</span><span id="l1Prog"></span></div>
+      <div class="lk1-nav">
+        <button class="btn small" id="l1PrevLick" type="button" ${pos > 0 ? "" : "disabled"}>‹ 이전 릭</button>
+        <span id="l1No">${esc(lick.id)}${pos >= 0 ? ` <small class="muted">${pos + 1}/${list.length}</small>` : ""}</span>
+        <button class="btn small" id="l1NextLick" type="button" ${pos >= 0 && pos < list.length - 1 ? "" : "disabled"}>다음 릭 ›</button>
+      </div>
+      <div class="nf-meta"><span></span><span id="l1Prog"></span></div>
       <div class="lk1-title"><b>${esc(r.title)}</b><small class="muted">${p ? `${esc(p.name)} · ` : ""}${esc(DIFF_NAMES[lickDifficulty(lick)])} · ${mode === "solo" ? "혼자 익히기" : "박자 맞춰 치기"}</small></div>
       <div class="tab-wrap score-wrap" id="l1Score" data-key="${st.key}"></div>
       <div class="fretboard" id="l1Board"></div>
@@ -92,6 +113,7 @@ export function mount(container, api) {
         </div>
         <div class="nf-actions lk-nav" style="margin-top:8px">
           <button class="btn small" id="l1Hear" type="button">이 음 듣기</button>
+          <button class="btn small" id="l1PlayAll" type="button">▶ 릭 듣기</button>
           <button class="btn small" id="l1Reset" type="button">처음부터</button>
         </div>
         ${parts.length > 1 ? `<div style="margin-top:8px">${segHtml("l1Part", parts, st.part)}</div>` : ""}` : `
@@ -153,6 +175,20 @@ export function mount(container, api) {
       if (st.runs % RUNS_PER_UNIT === 0) unit(); else api.toast(`끝까지 ${st.runs}번`);
     }
     persist(); drawSolo();
+  }
+  // 릭 전체를 이어서 듣기(지금 BPM, 악보에서 지금 음 강조). 다시 누르면 멈춤
+  let listening = false;
+  async function playAll() {
+    const b = $("#l1PlayAll");
+    if (listening) { stopLick(); listening = false; b.textContent = "▶ 릭 듣기"; drawSolo(); return; }
+    try {
+      listening = true; b.textContent = "■ 멈춤";
+      await playLick(r, st.bpm, { countIn: 0, onEvent: i => {
+        if (!listening) return;
+        if (i >= 0) paint(i);
+        else { listening = false; b.textContent = "▶ 릭 듣기"; drawSolo(); }
+      } });
+    } catch (err) { listening = false; b.textContent = "▶ 릭 듣기"; api.toast("소리를 낼 수 없음: " + err.message); }
   }
   async function hear() {
     const e = r.events[section()[st.cur]];
@@ -217,6 +253,7 @@ export function mount(container, api) {
     $("#l1Prev").onclick = () => { if (st.cur > 0) { st.cur--; persist(); drawSolo(); } };
     $("#l1Reset").onclick = () => { st.cur = 0; persist(); drawSolo(); };
     $("#l1Hear").onclick = hear;
+    $("#l1PlayAll").onclick = playAll;
     if ($("#l1Part")) $("#l1Part").addEventListener("click", e => {
       const b = e.target.closest("button[data-v]"); if (!b) return;
       $("#l1Part").querySelectorAll("button").forEach(x => x.classList.toggle("sel", x === b));
@@ -248,8 +285,11 @@ export function mount(container, api) {
     }));
     paint(-1); drawProg();
   }
+  const goLick = d => { const id = list[pos + d]; if (!id) return; persist(); show(id); };
+  $("#l1PrevLick").onclick = () => goLick(-1);
+  $("#l1NextLick").onclick = () => goLick(1);
   const watch = setInterval(() => { if (playing && !running()) stop(); }, 300);
-  return () => { clearInterval(watch); stop(); offs.forEach(f => f()); if (ev) ev.end(); };
+  return () => { clearInterval(watch); stop(); if (listening) stopLick(); offs.forEach(f => f()); if (ev) ev.end(); persist(); };
 }
 
 // 시험용

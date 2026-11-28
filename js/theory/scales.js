@@ -205,7 +205,8 @@ function poolOf(bs, rootPc, scaleId) {
 // 규칙: 각 구간의 음은 그 블록 안의 운지만 사용, 블록 전환은 정해진 줄에서 같은 줄 슬라이드(1~4프렛)로만
 //       줄 건너뛰기 없음, 같은 음 반복 없음
 // pool이 주어지면(완화 모드) 블록 밖이지만 그 블록 프렛 범위 ±1 안의 스케일 음도 감점을 두고 허용
-function routeShift(seq, ks, up, pool = null) {
+// slides: 허용하는 슬라이드 거리(프렛). 실제 연주처럼 온음(2프렛), 반음이 있는 스케일은 1프렛까지(v2.11.0)
+function routeShift(seq, ks, up, pool = null, slides = [2]) {
   const key = n => n.s + "-" + n.f;
   const sets = seq.map(b => new Set(b.notes.map(key)));
   const near = (ph, c) => pool && c.f >= seq[ph].lo - 1 && c.f <= seq[ph].hi + 1;
@@ -235,7 +236,7 @@ function routeShift(seq, ks, up, pool = null) {
       // 블록 전환: 정한 줄에서, 같은 줄 슬라이드, 다음 블록에만 있는 음으로
       if (st.ph < lastPhase && same && c.s === ks[st.ph] && !sets[st.ph].has(key(c)) && (sets[st.ph + 1].has(key(c)) || near(st.ph + 1, c))) {
         const d = Math.abs(c.f - st.c.f);
-        if (d >= 1 && d <= 4) opts.push([st.ph + 1, true, sets[st.ph + 1].has(key(c)) ? 0 : 3]);
+        if (slides.includes(d)) opts.push([st.ph + 1, true, sets[st.ph + 1].has(key(c)) ? 0 : 3]);
       }
       for (const [ph, slide, pen] of opts) {
         const cnt = same ? st.cnt + 1 : 1;
@@ -262,7 +263,7 @@ const SWITCH_SETS = {
   2: [[4], [3], [5], [2]],
   3: [[5, 3], [4, 2], [5, 2], [4, 3], [5, 4], [3, 2]]
 };
-function routeAny(seq, up, prefer, pool) {
+function routeAny(seq, up, prefer, pool, slides) {
   const base = SWITCH_SETS[seq.length] || [[]];
   const opts = up ? base : base.map(o => [...o].reverse());
   // 마지막 수단: 모든 줄 조합(같은 줄에서 두 번 바꾸는 경우 포함)
@@ -273,7 +274,7 @@ function routeAny(seq, up, prefer, pool) {
   const order = [...(prefer ? [prefer] : []), ...opts, ...extra].filter(o => !seen.has(o.join()) && seen.add(o.join()));
   // 1차: 블록 운지만 / 2차: 블록 근처 음까지 허용
   for (const p of [null, pool]) for (const ks of order) {
-    const r = routeShift(seq, ks, up, p);
+    const r = routeShift(seq, ks, up, p, slides);
     if (r) return { notes: r, ks };
   }
   return null;
@@ -294,19 +295,23 @@ export function connectPath(rootPc, scaleId, startIndex, count, shape, pick = 0)
   const prefer = opts[((pick % opts.length) + opts.length) % opts.length];
   const rev = [...sel].reverse();
   const pool = poolOf(sel, rootPc, scaleId);
+  const st = SCALES[scaleId] ? SCALES[scaleId].steps : [0, 2, 4, 5, 7, 9, 11];
+  const semi = st.some((x, i) => ((st[(i + 1) % st.length] - x + 12) % 12) === 1);
+  // 코드톤(아르페지오)은 이웃 음이 원래 3~4프렛 떨어져 있어 예전처럼 1~4프렛 허용
+  const slides = SCALES[scaleId] && SCALES[scaleId].chord ? [1, 2, 3, 4] : semi ? [1, 2] : [2];
   let notes;
   if (shape === "down") {
-    const r = routeAny(rev, false, [...prefer].reverse(), pool);
+    const r = routeAny(rev, false, [...prefer].reverse(), pool, slides);
     if (!r) return null;
     notes = r.notes;
   } else {
-    const a = routeAny(sel, true, prefer, pool);
+    const a = routeAny(sel, true, prefer, pool, slides);
     if (!a) return null;
     notes = a.notes;
     if (shape === "updown") {
       // 내려올 때는 올라갈 때와 다른 줄에서 바꿔 다른 경로로
       const other = opts.find(o => o.join() !== a.ks.join());
-      const b = routeAny(rev, false, other ? [...other].reverse() : null, pool);
+      const b = routeAny(rev, false, other ? [...other].reverse() : null, pool, slides);
       if (!b) return null;
       notes = notes.concat(b.notes.slice(1));
     }
